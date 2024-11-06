@@ -32,7 +32,7 @@ type Move = (Point, Point)
 
 legalMoves :: Game -> [Move]
 
-makeMove :: Game -> Player -> Move -> Game
+makeMove :: Game -> Player -> Turn -> Game
 
 state :: Game -> String
 
