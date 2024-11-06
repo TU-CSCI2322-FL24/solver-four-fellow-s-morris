@@ -13,14 +13,14 @@ Piece = (Player, Maybe Point)
 
 Pieces = [Piece]
 
-data Turn = Move ((Point, Point), Bool) | ReMove = (Point, Piece)
+data Turn = Move ((Point, Point), Bool) | ReMove (Point, Piece)
 --Move is a tuple of the 2 points that are changed in a move (ex: moving a piece off of one point 
 --and onto another). Returns true if that move will give the current player a mill
 --ReMove is for removing a piece if you have a mill
 
 legalMoves :: Game -> [Move]
 
-makeMove :: Game -> Player -> Move -> Game
+makeMove :: Game -> Player -> Turn -> Game
 
 state :: Game -> String
 
