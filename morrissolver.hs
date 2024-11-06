@@ -10,17 +10,16 @@ data Move = Up | Down | Left | Right
 type Winner = Maybe Player
 --Nothing if there's a tie
 
-type Mill = Maybe Player
---Nothing if no player has a mill
-
-type Mills = [Mill]
-
-type Point = (Int, Int, Maybe Player)
+type Point = (Int, Int)
 --Piece is nothing if no piece is on that space. The list of points contains adjacent points.
+
+type Filled = [(Point, Maybe Player)]
+
+type Board = [(Point, Maybe Piece)]
 
 type Game = [Point]
 
-type Piece = (Player, Maybe Point)
+type Piece = (Maybe Point, Player)
 --Point is nothing if the piece is removed.
 
 type Pieces = [Piece]
