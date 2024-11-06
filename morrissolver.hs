@@ -5,6 +5,8 @@ data Turn = Place | Remove
 --and onto another). Returns true if that move will give the current player a morris
 --ReMove is for removing a piece if you have a morris
 
+data Move = Up | Down | Left | Right
+
 type Winner = Maybe Player
 --Nothing if there's a tie
 
@@ -26,9 +28,6 @@ type Pieces = [Piece]
 type Place = (Point, Point, Bool)
 
 type Remove = (Point, Point)
-
-type Move = (Point, Point)
-
 
 legalMoves :: Game -> [Move]
 
