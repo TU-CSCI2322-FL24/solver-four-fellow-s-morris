@@ -1,6 +1,6 @@
 data Player = Black | White 
 
-data Turn = Place | ReMove 
+data Turn = Place | Remove 
 --Move is a tuple of the 2 points that are changed in a move (ex: moving a piece off of one point 
 --and onto another). Returns true if that move will give the current player a morris
 --ReMove is for removing a piece if you have a morris
