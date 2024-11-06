@@ -3,11 +3,6 @@ data Player = Black | White
 Winner = Maybe Player
 --Nothing if there’s a tie
 
-Mill = Maybe Player
---Nothing if no player has a mill
-
-Mills = [Mill]
-
 Point = (Maybe Piece, [Point])
 --Piece is nothing if no piece is on that space. The list of points contains adjacent points.
 
