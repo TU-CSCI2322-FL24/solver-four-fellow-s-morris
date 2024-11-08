@@ -33,4 +33,4 @@ legalMoves :: Game -> [Move]
 makeMove :: Game -> Player -> Turn -> Game
 
 state :: Game -> String
-
+-- change 2
