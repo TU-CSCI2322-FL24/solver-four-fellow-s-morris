@@ -29,8 +29,9 @@ type Place = (Point, Point, Bool)
 type Remove = (Point, Point)
 
 legalMoves :: Game -> [Move]
+legalMoves = undefined
 
 makeMove :: Game -> Player -> Turn -> Game
+makeMove = undefined
 
 state :: Game -> String
--- change 2
