@@ -9,7 +9,7 @@ import System.Directory (renameFile)
 
 data Player = B | W | O deriving (Eq, Show)
 
-data Turn = Place | Remove
+data Turn = Put | Remove
 --Move is a tuple of the 2 points that are changed in a move (ex: moving a piece off of one point 
 --and onto another). Returns true if that move will give the current player a morris
 --ReMove is for removing a piece if you have a morris
@@ -50,10 +50,11 @@ legalMoves board = [(pt, ply) | (pt,ply) <- board, ply == O]
 
 --Need to add error checking to make sure point is a legal point and on an open space in the board
 makeMove :: Board -> Player -> Point -> Turn -> Board
-makeMove board player point turn =
+makeMove board player point Put =
     map (\(pts, ply) -> if pts == point
                         then (pts, player)
                         else (pts, ply)) board
+makeMove board player point Remove = undefined
 
 boardToString :: String -> Board -> String
 boardToString boardString board =
