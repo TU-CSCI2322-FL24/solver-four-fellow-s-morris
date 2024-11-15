@@ -25,7 +25,7 @@ main = do
             placePhase Put (toPlayer playerCol) (toPlayer enemyCol) (toPlayer playerCol) 0 defaultBoard False
 
 
-placePhase :: Turn -> Player -> Player -> Player -> Int -> Board -> Bool -> IO ()
+placePhase :: Action -> Player -> Player -> Player -> Int -> Board -> Bool -> IO ()
 placePhase turn player enemy actor count board mill = do
     if mill then 
         if actor == player then enemyRemove board player enemy count Set else playerRemove board player enemy count Set
@@ -75,7 +75,7 @@ playerRemove board player enemy count phase = do
             putStrLn "It may not be the best idea to remove your own piece...\nPick one of the enemy's pieces!"
             playerRemove board player enemy count phase
 
-playPhase :: Turn -> Player -> Player -> Player -> Board -> Bool -> IO ()
+playPhase :: Action -> Player -> Player -> Player -> Board -> Bool -> IO ()
 playPhase turn player enemy actor board mill = do
     putStrLn "Beginning playPhase\n" 
     printBoard board
