@@ -6,6 +6,8 @@ import Text.Read
 import Morrissolver
 import Control.Monad
 
+data Phase = Set | Move | Fly deriving Eq
+
 main :: IO ()
 main = do
     resetBoard
@@ -20,12 +22,14 @@ main = do
         else do 
             let enemyCol = if playerCol == "B" then "W" else "B"
             putStrLn ("You selected " ++ playerCol ++ "\n")
-            placePhase Place (toPlayer playerCol) (toPlayer enemyCol) (toPlayer playerCol) 0 defaultBoard
+            placePhase Put (toPlayer playerCol) (toPlayer enemyCol) (toPlayer playerCol) 0 defaultBoard False
 
 
-placePhase :: Turn -> Player -> Player -> Player -> Int -> Board -> IO ()
-placePhase turn player enemy actor count board = do
-    if count > 8 then playPhase turn player enemy actor board else
+placePhase :: Turn -> Player -> Player -> Player -> Int -> Board -> Bool -> IO ()
+placePhase turn player enemy actor count board mill = do
+    if mill then 
+        if actor == player then enemyRemove board player enemy count Set else playerRemove board player enemy count Set
+        else if count > 8 then playPhase turn player enemy actor board mill else
         if actor == player then do
             putStrLn "\nPlace your piece [ (x, y) ]..."
             printBoard board
@@ -35,25 +39,50 @@ placePhase turn player enemy actor count board = do
                 legal = legalMoves board
             if testInput input then applyInput input board
             else if (placement, O) `elem` legal then do
-                newBoard <- playPiece board player placement
-                placePhase turn player enemy enemy count newBoard
+                newBoard <- placePiece board player placement
+                placePhase turn player enemy enemy count newBoard mill
             else do
                 putStrLn ("Cannot place a piece at " ++ show placement)
-                placePhase turn player enemy player count board
+                placePhase turn player enemy player count board mill
         else do
             let legal = fst (head (legalMoves board))
             putStrLn ("\nEnemy placed a piece on " ++ show legal)
-            newBoard <- playPiece board enemy legal
-            placePhase turn player enemy player (count + 1) newBoard
+            newBoard <- placePiece board enemy legal
+            placePhase turn player enemy player (count + 1) newBoard mill
 
-playPhase :: Turn -> Player -> Player -> Player -> Board -> IO ()
-playPhase turn player enemy actor board = do
+enemyRemove :: Board -> Player -> Player -> Int -> Phase -> IO ()
+enemyRemove board player enemy count phase = do 
+    let remPoint = fst (head [(x, y) | (x, y) <- board, y == player])
+        newBoard = makeMove board enemy remPoint Remove
+    putStrLn ("Enemy removed your piece at " ++ show remPoint ++ "!")
+    if phase == Set then placePhase Put player enemy player count board False else undefined
+
+playerRemove :: Board -> Player -> Player -> Int -> Phase -> IO ()
+playerRemove board player enemy count phase = do
+    putStrLn "You got a mill! Choose an opponents piece to remove..."
+    inputPlace <- getLine 
+    let input = map toUpper inputPlace
+        remPoint = parseTuple inputPlace
+        pointPlayer = lookupPlayer board remPoint
+    if pointPlayer == enemy then do
+        let newBoard = makeMove board player remPoint Remove
+        putStrLn ("You removed the enemy's piece at  " ++ show remPoint ++ "!")
+        if phase == Set then placePhase Put player enemy enemy count board False else undefined
+    else if pointPlayer == O then do 
+        putStrLn "That space is empty! Pick a space that's occupied by the enemy!"
+        playerRemove board player enemy count phase
+        else do 
+            putStrLn "It may not be the best idea to remove your own piece...\nPick one of the enemy's pieces!"
+            playerRemove board player enemy count phase
+
+playPhase :: Turn -> Player -> Player -> Player -> Board -> Bool -> IO ()
+playPhase turn player enemy actor board mill = do
     putStrLn "Beginning playPhase\n" 
     printBoard board
 
-playPiece :: Board -> Player -> Point -> IO Board
-playPiece board player placement = do
-    let newBoard = makeMove board player placement Place
+placePiece :: Board -> Player -> Point -> IO Board
+placePiece board player placement = do
+    let newBoard = makeMove board player placement Put
     return newBoard
 
 printBoard :: Board -> IO ()
