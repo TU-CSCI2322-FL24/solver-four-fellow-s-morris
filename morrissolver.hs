@@ -79,33 +79,46 @@ allEdges =
          ((7,4), (6,4)), ((6,4), (5,4))]
     in forward ++ [(b,a) | (a,b) <- forward]
 
-dicMills:: [[Point]]
-dicMills = [ [(1,1), (1,4), (1,7)],
-          [(2,2), (2,4), (2,6)],
-          [(3,3), (3,4), (3,5)],
-          [(4,1), (4,2), (4,3)],
-          [(4,5), (4,6), (4,7)],
-          [(5,3), (5,4), (5,5)],
-          [(6,2), (6,4), (6,6)],
-          [(7,1), (7,4), (7,7)],
-          [(1,1), (4,1), (7,1)],
-          [(2,2), (4,2), (6,2)],
-          [(3,3), (4,3), (5,3)],
-          [(1,4), (2,4), (3,4)],
-          [(5,4), (6,4), (7,4)],
-          [(3,5), (4,5), (5,5)],
-          [(2,6), (4,6), (6,6)],
-          [(1,7), (4,7), (7,7)] ]
+
+allMills:: [[Point]]
+allMills =
+    let forward = [
+            [(1,1), (1,4), (1,7)],
+            [(2,2), (2,4), (2,6)],
+            [(3,3), (3,4), (3,5)],
+            [(4,1), (4,2), (4,3)],
+            [(4,5), (4,6), (4,7)],
+            [(5,3), (5,4), (5,5)],
+            [(6,2), (6,4), (6,6)],
+            [(7,1), (7,4), (7,7)],
+            [(1,1), (4,1), (7,1)],
+            [(2,2), (4,2), (6,2)],
+            [(3,3), (4,3), (5,3)],
+            [(1,4), (2,4), (3,4)],
+            [(5,4), (6,4), (7,4)],
+            [(3,5), (4,5), (5,5)],
+            [(2,6), (4,6), (6,6)],
+            [(1,7), (4,7), (7,7)] ]
+    in forward ++ [(b,a) | (a,b) <- forward]
+
 
 -- need to keep track of mills
 -- wanna check after every turn if we have a mill
 -- can do this by checking if there are two edges that are conected 
     -- so if the y in one cordiante is the same as the x in the other and vice versa 
     -- lookUp point (x, y) && lookup 
-mill :: Player -> Board -> Bool
-mill player board =
-    let playerPiecesOnBoard = [ pos| (pos, ply) <- board, ply == player]
-    in  any (\mill -> length (playerPositions `intersect` mill) == length mill) dicMills
+--mill :: Player -> Board -> Bool
+--mill player board =
+    --let playerPiecesOnBoard = [ pos| (pos, ply) <- board, ply == player]
+    --in  any (\mill -> length (playerPositions `intersect` mill) == length mill) allMills
+
+ismill :: Point -> Board -> Player -> Bool
+ismill pieceLoc board pl =
+    let adjacentMills = [mill | mill <- allMills, pieceLoc `elem` mill]
+        playerFilled mill = all (\point -> lookup point board == Just pl) mill
+    in any playerFilled adjacentMills
+
+
 
 --determine who is gonna win the game 
 --either the oppnoet only has 2 pices left or they have no more legal moves 
