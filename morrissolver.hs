@@ -169,7 +169,7 @@ validMoves place game =
                  in filter (\point -> point `elem` allPoints && isOpen point) possibleMoves
         else []
 
---How to incorporate removes into the list of acctions?
+--How to incorporate removes into the list of actions?
 legalActions :: Game -> [Action]
 legalActions game =
     let board = getBoard game
@@ -178,7 +178,7 @@ legalActions game =
         else [validMoves place | place <- getPlayerPlaces game player]
 
 
---what should i put in other then O 
+--what should i put in other than O 
 legalPlaces :: Board -> [Place]
 legalPlaces board = [place | place <- board, isOpen place]
 
