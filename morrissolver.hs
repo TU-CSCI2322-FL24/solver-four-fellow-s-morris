@@ -198,7 +198,7 @@ makeMove game point action =
         player = getPlayer game
         openBoard = legalMoves board
     in case action of
-        --instead of using map use concat to remove from list 
+        --instead of using map use concat to remove from list
         --need to not use O
         Place -> map (\(pts, ply) -> if pts == point then (pts, player) else (pts,ply)) openBoard
         Remove -> map (\(pts, p) -> if pts == point then (pts, O) else (pts,p)) openBoard
