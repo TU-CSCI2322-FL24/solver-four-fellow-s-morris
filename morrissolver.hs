@@ -32,10 +32,12 @@ type Point = (Int, Int)
 ----Piece is nothing if no piece is on that space. The list of points contains adjacent points.
 
 --State of the board 
+
 type Board = [Place]
 
 -- Point is location of a piece on the board 
 type Place = (Point, Maybe Player)
+
 
 --type Remove = Point
 
@@ -81,6 +83,7 @@ allEdges =
          ((7,4), (6,4)), ((6,4), (5,4))]
     in forward ++ [(b,a) | (a,b) <- forward]
 
+
 allMills:: [[Point]]
 allMills = [ [(1,1), (1,4), (1,7)],
              [(2,2), (2,4), (2,6)],
@@ -99,11 +102,13 @@ allMills = [ [(1,1), (1,4), (1,7)],
              [(2,6), (4,6), (6,6)],
              [(1,7), (4,7), (7,7)] ]
 
+
 -- need to keep track of mills
 -- wanna check after every turn if we have a mill
 -- can do this by checking if there are two edges that are conected 
     -- so if the y in one cordiante is the same as the x in the other and vice versa 
     -- lookUp point (x, y) && lookup 
+
 mill :: Point -> Board -> Maybe Player -> Bool
 mill pieceLoc board pl =
     let adjacentMills = [mill | mill <- allMills, pieceLoc `elem` mill]
@@ -201,7 +206,6 @@ legalActions game =
                 aux [] = []
                 aux (plc:plcs) = validMoves plc game ++ aux plcs
             in  aux place
-
 legalPlaces :: Board -> [Place]
 legalPlaces board = [place | place <- board, isOpen place]
 
@@ -210,9 +214,6 @@ legalPlaces board = [place | place <- board, isOpen place]
 --Is there a way to set a default value?
 --Do we need to change this in order to make it incorporate a game return as opposed to board?
 --We need to rewrite this function tbh
-
-
-
 makeMove :: Game -> Point -> Action -> Game
 makeMove game point action =
     let board = getBoard game
@@ -237,7 +238,6 @@ allPossibleMoves game =
         removes = [Remove (fst pieces) | pieces <- board, snd pieces == Just (opponent player)]
     in (moves, removes)
 
-
 whoWillWin :: Game -> Player -> Winner
 whoWillWin game player =
     case gameWinner game of
@@ -255,7 +255,6 @@ whoWillWin game player =
                     else Nothing
 
 
-
 boardToString :: String -> Board -> String
 boardToString boardString board =
     let aux :: String -> [Point] -> String
@@ -267,11 +266,13 @@ boardToString boardString board =
                     Just B  -> 'B' : aux xs ps
                     Just W  -> 'W' : aux xs ps
                     Nothing -> 'O' : aux xs ps
+
                 else x : aux xs (p:ps)
     in aux boardString orderedPoints
 
 getBoardString :: IO String
 getBoardString = readFile "Board.txt"
+
 
 lookupPlayer :: Board -> Point -> Maybe Player
 lookupPlayer [] _ = Nothing  -- Default to O if no player is on a point
