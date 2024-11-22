@@ -109,8 +109,8 @@ allMills = [ [(1,1), (1,4), (1,7)],
     -- so if the y in one cordiante is the same as the x in the other and vice versa 
     -- lookUp point (x, y) && lookup 
 
-mill :: Point -> Board -> Maybe Player -> Bool
-mill pieceLoc board pl =
+isMill :: Point -> Board -> Maybe Player -> Bool
+isMill pieceLoc board pl =
     let adjacentMills = [mill | mill <- allMills, pieceLoc `elem` mill]
         playerFilled = all (\l -> lookup l board == Just pl)
     in any playerFilled adjacentMills
@@ -206,6 +206,7 @@ legalActions game =
                 aux [] = []
                 aux (plc:plcs) = validMoves plc game ++ aux plcs
             in  aux place
+
 legalPlaces :: Board -> [Place]
 legalPlaces board = [place | place <- board, isOpen place]
 
@@ -214,20 +215,26 @@ legalPlaces board = [place | place <- board, isOpen place]
 --Is there a way to set a default value?
 --Do we need to change this in order to make it incorporate a game return as opposed to board?
 --We need to rewrite this function tbh
-makeMove :: Game -> Point -> Action -> Game
-makeMove game point action =
+makeMove :: Game -> Action -> Game
+makeMove game action =
     let board = getBoard game
         player = getPlayer game
         openBoard = getEmptyPlaces game
     in case action of
         --instead of using map use concat to remove from list
         --need to not use O
-        Put point -> 
+        Put point ->
             let newBoard = map (\(pts, Just ply) -> if pts == point then (pts, Just player) else (pts, Just ply)) openBoard
+            in  (newBoard, opponent player, getPhase game, isMill point newBoard (Just player))
+        Remove point ->
+            let newBoard = map (\(pts, p) -> if pts == point then (pts, Nothing) else (pts,p)) openBoard
             in  (newBoard, opponent player, getPhase game, getMill game)
-        Remove point -> 
-            let newBoard = map (\(pts, p) -> if pts == point then (pts, Nothing) else (pts,p)) openBoard 
-            in  (newBoard, opponent player, getPhase game, getMill game)
+        Move (point1, point2) ->
+            let putGame = makeMove game (Put point2)
+                newGame = makeMove putGame (Remove point1)
+                newBoard = getBoard newGame
+                hasMill = isMill point2 newBoard (Just player)
+            in  (newBoard, opponent player, getPhase game, hasMill)
 
 --Need to adjust types
 allPossibleMoves :: Game -> ([Action], [Action])
@@ -244,15 +251,16 @@ whoWillWin game player =
         Just winner -> Just winner
         Nothing ->
             let board = getBoard game
-                moves = fst $ allPossibleMoves game 
-                removes = snd $ allPossibleMoves game
-                newGames = [makeMove game point move | point <- map fst (getPlayerPlaces game (Just player)), move <- moves]
+                moves = fst $ allPossibleMoves game
+                newGames = [makeMove game move | move <- moves]
+                millGames = filter getMill newGames
+                removedGames = concat [snd (allPossibleMoves g) | g <- millGames]
                 winners = map (\newGame -> whoWillWin newGame (opponent player)) newGames
             in if Just player `elem` winners
                 then Just player
                 else if all (== Just (opponent player)) winners
-                    then Just (opponent player) 
-                    else Nothing
+                    then Just $ opponent player
+                    else Nothing --change to recursive call
 
 
 boardToString :: String -> Board -> String
