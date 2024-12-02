@@ -85,24 +85,24 @@ allEdges =
     in forward ++ [(b,a) | (a,b) <- forward]
 
 
-allMills:: [[Point]]
-allMills =[
-            [(1,1), (1,4), (1,7)],
-            [(2,2), (2,4), (2,6)],
-            [(3,3), (3,4), (3,5)],
-            [(4,1), (4,2), (4,3)],
-            [(4,5), (4,6), (4,7)],
-            [(5,3), (5,4), (5,5)],
-            [(6,2), (6,4), (6,6)],
-            [(7,1), (7,4), (7,7)],
-            [(1,1), (4,1), (7,1)],
-            [(2,2), (4,2), (6,2)],
-            [(3,3), (4,3), (5,3)],
-            [(1,4), (2,4), (3,4)],
-            [(5,4), (6,4), (7,4)],
-            [(3,5), (4,5), (5,5)],
-            [(2,6), (4,6), (6,6)],
-            [(1,7), (4,7), (7,7)] ]
+
+allMills = [ [(1,1), (1,4), (1,7)],
+             [(2,2), (2,4), (2,6)],
+             [(3,3), (3,4), (3,5)],
+             [(4,1), (4,2), (4,3)],
+             [(4,5), (4,6), (4,7)],
+             [(5,3), (5,4), (5,5)],
+             [(6,2), (6,4), (6,6)],
+             [(7,1), (7,4), (7,7)],
+             [(1,1), (4,1), (7,1)],
+             [(2,2), (4,2), (6,2)],
+             [(3,3), (4,3), (5,3)],
+             [(1,4), (2,4), (3,4)],
+             [(5,4), (6,4), (7,4)],
+             [(3,5), (4,5), (5,5)],
+             [(2,6), (4,6), (6,6)],
+             [(1,7), (4,7), (7,7)] ]
+
 
 
 -- need to keep track of mills
@@ -110,11 +110,13 @@ allMills =[
 -- can do this by checking if there are two edges that are conected 
     -- so if the y in one cordiante is the same as the x in the other and vice versa 
     -- lookUp point (x, y) && lookup 
+
 isMill :: Point -> Board -> Maybe Player -> Bool
 isMill pieceLoc board pl =
     let adjacentMills = [mill | mill <- allMills, pieceLoc `elem` mill]
         playerFilled = all (\l -> lookup l board == Just pl)
     in any playerFilled adjacentMills
+
 
 
 
@@ -156,6 +158,8 @@ getPlayer (_,a,_,_,_) = a
 
 getMill :: Game -> Bool
 getMill (_,_,_,a,_) = a
+
+
 
 isLegalMove :: Board -> Place -> Bool
 isLegalMove board move = move `elem` board
@@ -216,6 +220,7 @@ legalPlaces board = [place | place <- board, isOpen place]
 
 
 
+
 -- did pattern match instead as well as included the error handling \
 -- add +1 for every turn and once get to 200 the game should output end 
 makeMove :: Game -> Action -> Game
@@ -238,6 +243,7 @@ makeMove game@(board, player, 2, False, turns) (Move (from, to)) =
         in (newBoard, opponent player, 2, isMill to newBoard (Just player), turns)
 
 makeMove _ _ = error "Invalid action"
+
 
 --Need to adjust types
 allPossibleMoves :: Game -> ([Action], [Action])
