@@ -49,8 +49,9 @@ type Place = (Point, Maybe Player)
 --Int tells us how many pieces we have 
 --Bool is if last piece made a mill or not and then we wwant to remove
 type Phase = Int
+type TurnCounter = Int
 
-type Game = (Board, Player, Phase, Bool)
+type Game = (Board, Player, Phase, Bool, TurnCounter)
 
 
 allPoints :: [Point]
@@ -84,7 +85,7 @@ allEdges =
     in forward ++ [(b,a) | (a,b) <- forward]
 
 
-allMills:: [[Point]]
+
 allMills = [ [(1,1), (1,4), (1,7)],
              [(2,2), (2,4), (2,6)],
              [(3,3), (3,4), (3,5)],
@@ -103,6 +104,7 @@ allMills = [ [(1,1), (1,4), (1,7)],
              [(1,7), (4,7), (7,7)] ]
 
 
+
 -- need to keep track of mills
 -- wanna check after every turn if we have a mill
 -- can do this by checking if there are two edges that are conected 
@@ -115,10 +117,14 @@ isMill pieceLoc board pl =
         playerFilled = all (\l -> lookup l board == Just pl)
     in any playerFilled adjacentMills
 
+
+
+
+
 --determine who is gonna win the game 
 --either the oppnoet only has 2 pices left or they have no more legal moves 
 gameWinner :: Game -> Winner
-gameWinner (board, player, _, _)=
+gameWinner (board, player, _, _,_)=
     let playerPieces =  length [ pos| (pos, ply) <- board, ply == Just (opponent player)]
         anyLegalMoves = length (legalPlaces board)
     in if playerPieces <= 2 || anyLegalMoves < 1 then Just player else Nothing
@@ -142,16 +148,18 @@ makeBoard :: [Point] -> Board
 makeBoard allPoints = [(x, Nothing) | x <- allPoints]
 
 getBoard :: Game -> Board
-getBoard (a,_,_,_) = a
+getBoard (a,_,_,_,_) = a
 
 getPhase :: Game -> Phase
-getPhase (_,_,a,_) = a
+getPhase (_,_,a,_,_) = a
 
 getPlayer :: Game -> Player
-getPlayer (_,a,_,_) = a
+getPlayer (_,a,_,_,_) = a
 
 getMill :: Game -> Bool
-getMill (_,_,_,a) = a
+getMill (_,_,_,a,_) = a
+
+
 
 isLegalMove :: Board -> Place -> Bool
 isLegalMove board move = move `elem` board
@@ -211,30 +219,31 @@ legalPlaces :: Board -> [Place]
 legalPlaces board = [place | place <- board, isOpen place]
 
 
---Need to add error checking to make sure point is a legal point and on an open space in the board
---Is there a way to set a default value?
---Do we need to change this in order to make it incorporate a game return as opposed to board?
---We need to rewrite this function tbh
+
+
+-- did pattern match instead as well as included the error handling \
+-- add +1 for every turn and once get to 200 the game should output end 
 makeMove :: Game -> Action -> Game
-makeMove game action =
-    let board = getBoard game
-        player = getPlayer game
-        openBoard = getEmptyPlaces game
-    in case action of
-        --instead of using map use concat to remove from list
-        --need to not use O
-        Put point ->
-            let newBoard = map (\(pts, Just ply) -> if pts == point then (pts, Just player) else (pts, Just ply)) openBoard
-            in  (newBoard, opponent player, getPhase game, isMill point newBoard (Just player))
-        Remove point ->
-            let newBoard = map (\(pts, p) -> if pts == point then (pts, Nothing) else (pts,p)) openBoard
-            in  (newBoard, opponent player, getPhase game, getMill game)
-        Move (point1, point2) ->
-            let putGame = makeMove game (Put point2)
-                newGame = makeMove putGame (Remove point1)
-                newBoard = getBoard newGame
-                hasMill = isMill point2 newBoard (Just player)
-            in  (newBoard, opponent player, getPhase game, hasMill)
+makeMove game@(board, player, phase, True, 200) _ = error "Game is over!"
+makeMove game@(board, player, phase, True, turns) (Remove point) =
+    let newBoard = map (\(pts, p) -> if pts == point then (pts, Nothing) else (pts, p)) board
+    in (newBoard, player, phase, False, turns)
+makeMove game@(board, player, phase, True, turns) _ = error "Must be a Remove action"
+makeMove game@(board, player, phase, False, turns) (Remove point) = error "Cannot perform a Remove action in this phase"
+
+makeMove game@(board, player, 1, False, turns) (Put point) =
+    let newBoard = map (\(pts, p) -> if pts == point then (pts, Just player) else (pts, p)) board
+        nextPhase = if turns == 1 then 2 else 1
+    in (newBoard, opponent player, nextPhase, isMill point newBoard (Just player), turns + 1)
+
+makeMove game@(board, player, 2, False, turns) (Move (from, to)) =
+    if not (isLegalMove board (to, Nothing)) then error "Illegal move"
+    else
+        let newBoard = map (\(pts, p) -> if pts == from then (pts, Nothing) else if pts == to then (pts, Just player) else (pts, p)) board
+        in (newBoard, opponent player, 2, isMill to newBoard (Just player), turns)
+
+makeMove _ _ = error "Invalid action"
+
 
 --Need to adjust types
 allPossibleMoves :: Game -> ([Action], [Action])
