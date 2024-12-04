@@ -6,6 +6,28 @@ import Text.Read
 import Morrissolver
 import Control.Monad
 
+
+main :: IO ()
+main = do
+    putStrLn "Select player color (B/W): "
+    input <- getLine
+    let playerCol = map toUpper input
+    if playerCol `elem` quitInputs then putStrLn "Goodbye"
+        else if playerCol /= "B" && playerCol /= "W"
+        then do
+            putStrLn (playerCol ++ " is not a valid color.")
+            main
+        else do 
+            let enemyCol = if playerCol == "B" then "W" else "B"
+            putStrLn ("You selected " ++ playerCol ++ "\n")
+
+
+quitInputs :: [String]
+quitInputs = ["QUIT", "Q", "EXIT", "END"]
+
+
+{-
+
 data Phase = Set | Move | Fly deriving Eq
 
 main :: IO ()
@@ -94,7 +116,6 @@ printBoard board = do
 toPlayer :: String -> Player
 toPlayer "B" = B
 toPlayer "W" = W
-toPlayer _ = O
 
 parseTuple :: String -> Point
 parseTuple s = 
@@ -135,4 +156,4 @@ applyInput input board =
         printBoard board
 
 defaultBoard :: Board
-defaultBoard = makeBoard allPoints
+defaultBoard = makeBoard allPoints -}
