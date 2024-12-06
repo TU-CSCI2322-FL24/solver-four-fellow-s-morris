@@ -55,9 +55,6 @@ type TurnCounter = Int
 type Game = (Board, Player, Phase, Bool, TurnCounter)
 
 
-game :: Game
-game = (makeBoard allPoints, B, 1, False, 0)
-
 allPoints :: [Point]
 allPoints = [(1,7), (4,7), (7,7), (2,6), (6,6), (3,5), (4,5), (5,5),
                  (1,4), (2,4), (3,4), (5,4), (6,4), (7,4), (3,3), (4,3), (5,3),
@@ -112,6 +109,9 @@ allMills = [ [(1,1), (1,4), (1,7)],
 -- can do this by checking if there are two edges that are conected 
     -- so if the y in one cordiante is the same as the x in the other and vice versa 
     -- lookUp point (x, y) && lookup 
+
+newGame :: Player -> Game
+newGame player = (makeBoard allPoints, player, 1, False, 0)
 
 isMill :: Point -> Board -> Maybe Player -> Bool
 isMill pieceLoc board pl =
@@ -218,7 +218,7 @@ makeMove game@(board, player, phase, False, turns) (Remove point) = error "Canno
 
 makeMove game@(board, player, 1, False, turns) (Put point) =
     let newBoard = map (\(pts, p) -> if pts == point then (pts, Just player) else (pts, p)) board
-        nextPhase = if turns == 1 then 2 else 1
+        nextPhase = if turns >= 18 then 2 else 1
     in (newBoard, opponent player, nextPhase, isMill point newBoard (Just player), turns + 1)
 
 makeMove game@(board, player, 2, False, turns) (Move (from, to)) =

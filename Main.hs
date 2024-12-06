@@ -3,8 +3,9 @@ import Data.Char
 import System.IO
 import Data.Maybe
 import Text.Read
-import Morrissolver
 import Control.Monad
+import Morrissolver
+
 
 
 main :: IO ()
@@ -12,19 +13,93 @@ main = do
     putStrLn "Select player color (B/W): "
     input <- getLine
     let playerCol = map toUpper input
-    if playerCol `elem` quitInputs then putStrLn "Goodbye"
+    if playerCol `elem` quitInputs then quitGame
         else if playerCol /= "B" && playerCol /= "W"
         then do
             putStrLn (playerCol ++ " is not a valid color.")
             main
-        else do 
+        else do
             let enemyCol = if playerCol == "B" then "W" else "B"
             putStrLn ("You selected " ++ playerCol ++ "\n")
+            let player = removeMaybe (stringPlayer playerCol)
+                enemy = removeMaybe (stringPlayer enemyCol)
+                game = newGame player
+            putStrLn "Place your first piece!\n"
+            showBoard game
+            placePhase game player
 
+placePhase :: Game -> Player -> IO ()
+placePhase game player = if getMill game then enemyRemove game (opponent player) else do
+    i <- getLine
+    let input = map toUpper i
+    if input `elem` quitInputs then quitGame else if input `elem` showBoardInputs then do
+        showBoard game
+        placePhase game player
+    else do
+        let placement = parseTuple input
+            legal = [fst l | l <- legalPlaces (getBoard game)]
+        if placement `elem` legal then do
+            let g = makeMove game (Put placement)
+            putStrLn ("Placed a piece at " ++ show placement ++ "\n\n")
+            enemyPlace g (opponent player)
+        else do
+            putStrLn "Invalid move. Did you format your input as (x,y)?\nPlace a piece!\n"
+            placePhase game player
+
+playerRemove :: Game -> Player -> IO ()
+playerRemove game player = do
+    putStrLn ("You got a mill! Select one of " ++ playerString (Just (opponent player)) ++ "'s pieces to remove!")
+    i <- getLine
+    let input = map toUpper i
+    if input `elem` quitInputs then quitGame else if input `elem` showBoardInputs then do
+        showBoard game
+        playerRemove game player
+    else do
+        let placement = parseTuple input
+            legal = [fst l | l <- getPlayerPlaces game (Just (opponent player))]
+        if placement `elem` legal then do
+            let g = makeMove game (Remove placement)
+            putStrLn ("Removed piece at " ++ show placement ++ "\n\n")
+            enemyPlace g (opponent player)
+        else do
+            putStrLn "Invalid move. Did you format your input as (x,y)?\nRemove a piece!\n"
+            playerRemove game player
+
+enemyPlace :: Game -> Player -> IO ()
+enemyPlace game enemy = if getMill game then playerRemove game (opponent enemy) else do 
+    let legal = head [fst l | l <- legalPlaces (getBoard game)]
+        g = makeMove game (Put legal)
+    putStrLn ("Player " ++ playerString (Just enemy) ++ " placed a piece at " ++ show legal ++ "\n\nYour turn!\n")
+    placePhase g (opponent enemy)
+
+enemyRemove :: Game -> Player -> IO ()
+enemyRemove game enemy = do
+    let plyPieces = head [fst l | l <- getPlayerPlaces game (Just (opponent enemy))]
+        g = makeMove game (Remove plyPieces)
+    putStrLn ("Player " ++ playerString (Just enemy) ++ " removed your piece at " ++ show plyPieces ++ "\n\nYour turn!\n")
+    placePhase g (opponent enemy)
 
 quitInputs :: [String]
 quitInputs = ["QUIT", "Q", "EXIT", "END"]
 
+showBoardInputs :: [String]
+showBoardInputs = ["BOARD", "STATE", "GAME", "G", "SHOW"]
+
+showBoard :: Game -> IO ()
+showBoard game = putStrLn ("\n" ++ prettyPrint game)
+
+quitGame :: IO ()
+quitGame = putStrLn "Goodbye"
+
+parseTuple :: String -> Point
+parseTuple s =
+    let trimmed = filter (`notElem` " ()") s
+    in case break (== ',') trimmed of
+        (aStr, ',' : bStr) ->
+            case (readMaybe aStr, readMaybe bStr) of
+                (Just intA, Just intB) -> (intA, intB)
+                _ -> (99999, 99999)
+        _ -> (99999, 99999)
 
 {-
 
