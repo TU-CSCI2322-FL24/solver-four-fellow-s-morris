@@ -17,16 +17,17 @@ data Action = Put Point | Move (Point, Point) | Remove Point deriving (Eq, Show)
 --and onto another). Returns true if that move will give the current player a morris
 --ReMove is for removing a piece if you have a morris
 
-data Result = OnGoing | Tie | Win Player deriving (Eq, Show)
+--data Result = OnGoing | Tie | Win Player deriving (Eq, Show)
 
 --Place: where the players piece are curently at
 -- Move: where the player is moveing a piece from one point to another 
 -- Remove: feature removing opponets piece after they have made a mill
+data Winner = Tie | Win Player deriving (Eq, Show)
 
+data Result = Ongoing | Over Winner deriving (Eq, Show)
 
-
-type Winner = Maybe Player
 --Nothing if there's a tie
+    -- what is it for ongoing?
 
 type Point = (Int, Int)
 ----Piece is nothing if no piece is on that space. The list of points contains adjacent points.
@@ -38,6 +39,7 @@ type Board = [Place]
 -- Point is location of a piece on the board 
 type Place = (Point, Maybe Player)
 
+type Rating = Int
 
 --type Remove = Point
 
@@ -48,9 +50,10 @@ type Place = (Point, Maybe Player)
 -- Phase 2/3, removing
 --Int tells us how many pieces we have 
 --Bool is if last piece made a mill or not and then we wwant to remove
-type Phase = Int
+type Phase = Int -- bool?
+type TurnCounter = Int
 
-type Game = (Board, Player, Phase, Bool)
+type Game = (Board, Player, Phase, Bool, TurnCounter)
 
 
 allPoints :: [Point]
@@ -117,12 +120,11 @@ isMill pieceLoc board pl =
 
 --determine who is gonna win the game 
 --either the oppnoet only has 2 pices left or they have no more legal moves 
-gameWinner :: Game -> Winner
-gameWinner (board, player, _, _)=
+gameWinner :: Game -> Result
+gameWinner (board, player, _, _, _)=
     let playerPieces =  length [ pos| (pos, ply) <- board, ply == Just (opponent player)]
         anyLegalMoves = length (legalPlaces board)
-    in if playerPieces <= 2 || anyLegalMoves < 1 then Just player else Nothing
-
+    in if playerPieces <= 2 || anyLegalMoves < 1 then Over (Win player) else Ongoing
 
 opponent :: Player -> Player
 opponent B = W
@@ -142,16 +144,16 @@ makeBoard :: [Point] -> Board
 makeBoard allPoints = [(x, Nothing) | x <- allPoints]
 
 getBoard :: Game -> Board
-getBoard (a,_,_,_) = a
+getBoard (a,_,_,_,_) = a
 
 getPhase :: Game -> Phase
-getPhase (_,_,a,_) = a
+getPhase (_,_,a,_,_) = a
 
 getPlayer :: Game -> Player
-getPlayer (_,a,_,_) = a
+getPlayer (_,a,_,_,_) = a
 
 getMill :: Game -> Bool
-getMill (_,_,_,a) = a
+getMill (_,_,_,a,_) = a
 
 isLegalMove :: Board -> Place -> Bool
 isLegalMove board move = move `elem` board
@@ -171,21 +173,19 @@ getEmptyPlaces game = getPlayerPlaces game Nothing
 --Not technically a list of moves, since moves are (point,point) and this is a list of points, 
 --to get it into a list of moves, it would only require adding the starting point passed in
 validMoves :: Place -> Game -> [Action]
-validMoves place game =
-    let board = getBoard game
-        player = getPlayer game
-    in if getPhase game == 3
-        then zipFly player game
-        else if getPhase game == 2
-            then
-                let point = fst place
-                    x = fst point
-                    y = snd point
-                    possibleMoves = [(x, y + 1), (x, y - 1), (x - 1, y), (x + 1, y)]
-                    currentSpaces = getPlayerPlaces game (Just player)
-                    filteredMoves = filter (\point -> point `elem` allPoints && isOpen (point, lookupPlayer board point)) possibleMoves
-                in  [Move ((x,y), z) | z <- filteredMoves]
-            else []
+validMoves place@(point, _) game@(board, player, phase, _, _)
+  | phase == 3 = zipFly player game
+  | phase == 2 =
+      let x = fst point
+          y = snd point
+          possibleMoves = [(x, y + 1), (x, y - 1), (x - 1, y), (x + 1, y)]
+          currentSpaces = getPlayerPlaces game (Just player)
+          filteredMoves = filter
+            (\point -> point `elem` allPoints && isOpen (point, lookupPlayer board point))
+            possibleMoves
+      in [Move ((x, y), z) | z <- filteredMoves]
+  | otherwise = []
+
 
 
 zipFly :: Player -> Game -> [Action]
@@ -196,17 +196,14 @@ zipFly player game =
 
 --How to incorporate removes into the list of acctions?
 legalActions :: Game -> [Action]
-legalActions game =
-    let board = getBoard game
-        player = getPlayer game
-    in  if getPhase game == 1 then [Put l | l <- allPoints \\ map fst board]
-        else
-            let place = getPlayerPlaces game (Just player)
-                aux :: [Place] -> [Action]
-                aux [] = []
-                aux (plc:plcs) = validMoves plc game ++ aux plcs
-            in  aux place
-
+legalActions game@(board, player, phase, _, _) =
+    if phase == 1 then [Put l | l <- allPoints \\ map fst board]
+    else
+        let place = getPlayerPlaces game (Just player)
+            aux :: [Place] -> [Action]
+            aux [] = []
+            aux (plc:plcs) = validMoves plc game ++ aux plcs
+        in  aux place
 legalPlaces :: Board -> [Place]
 legalPlaces board = [place | place <- board, isOpen place]
 
@@ -216,51 +213,80 @@ legalPlaces board = [place | place <- board, isOpen place]
 --Do we need to change this in order to make it incorporate a game return as opposed to board?
 --We need to rewrite this function tbh
 makeMove :: Game -> Action -> Game
-makeMove game action =
-    let board = getBoard game
-        player = getPlayer game
-        openBoard = getEmptyPlaces game
-    in case action of
-        --instead of using map use concat to remove from list
-        --need to not use O
-        Put point ->
-            let newBoard = map (\(pts, Just ply) -> if pts == point then (pts, Just player) else (pts, Just ply)) openBoard
-            in  (newBoard, opponent player, getPhase game, isMill point newBoard (Just player))
-        Remove point ->
-            let newBoard = map (\(pts, p) -> if pts == point then (pts, Nothing) else (pts,p)) openBoard
-            in  (newBoard, opponent player, getPhase game, getMill game)
-        Move (point1, point2) ->
-            let putGame = makeMove game (Put point2)
-                newGame = makeMove putGame (Remove point1)
-                newBoard = getBoard newGame
-                hasMill = isMill point2 newBoard (Just player)
-            in  (newBoard, opponent player, getPhase game, hasMill)
+makeMove game@(board, player, phase, True, 200) _ = error "Game is over!"
+makeMove game@(board, player, phase, True, turns) (Remove point) =
+    let newBoard = map (\(pts, p) -> if pts == point then (pts, Nothing) else (pts, p)) board
+    in (newBoard, player, phase, False, turns)
+makeMove game@(board, player, phase, True, turns) _ = error "Must be a Remove action"
+makeMove game@(board, player, phase, False, turns) (Remove point) = error "Cannot perform a Remove action in this phase"
+
+makeMove game@(board, player, 1, False, turns) (Put point) =
+    let newBoard = map (\(pts, p) -> if pts == point then (pts, Just player) else (pts, p)) board
+        nextPhase = if turns == 1 then 2 else 1
+    in (newBoard, opponent player, nextPhase, isMill point newBoard (Just player), turns + 1)
+
+makeMove game@(board, player, 2, False, turns) (Move (from, to)) =
+    if not (isLegalMove board (to, Nothing)) then error "Illegal move"
+    else
+        let newBoard = map (\(pts, p) -> if pts == from then (pts, Nothing) else if pts == to then (pts, Just player) else (pts, p)) board
+        in (newBoard, opponent player, 2, isMill to newBoard (Just player), turns)
+
+makeMove _ _ = error "Invalid action"
 
 --Need to adjust types
-allPossibleMoves :: Game -> ([Action], [Action])
-allPossibleMoves game =
-    let player = getPlayer game
-        board = getBoard game
-        moves = legalActions game
-        removes = [Remove (fst pieces) | pieces <- board, snd pieces == Just (opponent player)]
-    in (moves, removes)
+allPossibleMoves :: Game -> [Action]
+allPossibleMoves game@(board, player, phase, False, _) = legalActions game
+allPossibleMoves game@(board, player, phase, True, _) =
+     [Remove (fst pieces) | pieces <- board, snd pieces == Just (opponent player)]
 
-whoWillWin :: Game -> Player -> Winner
-whoWillWin game player =
+whoWillWin :: Game -> Winner
+whoWillWin game@(board,player,_,_,_)  =
     case gameWinner game of
-        Just winner -> Just winner
-        Nothing ->
-            let board = getBoard game
-                moves = fst $ allPossibleMoves game
+        Over winner -> winner
+        Ongoing ->
+            let moves = allPossibleMoves game
                 newGames = [makeMove game move | move <- moves]
-                millGames = filter getMill newGames
-                removedGames = concat [snd (allPossibleMoves g) | g <- millGames]
-                winners = map (\newGame -> whoWillWin newGame (opponent player)) newGames
-            in if Just player `elem` winners
+                winners = map whoWillWin newGames
+            in bestFor player winners {-if Just player `elem` winners
                 then Just player
                 else if all (== Just (opponent player)) winners
-                    then Just $ opponent player
-                    else Nothing --change to recursive call
+                    then Just (opponent player) 
+                    else Nothing-}
+
+bestFor :: Player -> [Winner] -> Winner
+bestFor player winners
+    | Win player `elem` winners = Win player
+    | Tie `elem` winners        = Tie
+    | otherwise                 = Win (opponent player)
+
+helper :: [(a,b)] -> [b]
+helper lst = [snd b | b <- lst]
+
+bestMove :: (Action,Game) -> Action
+bestMove (mv,game) =
+    let turn = (mv,game)
+    in
+        case gameWinner game of
+            Over winner -> fst turn
+            Ongoing ->
+                let moves = allPossibleMoves game
+                    newGames = [(move, makeMove game move) | move <- moves]
+                    bests = map bestMove newGames
+                    winners = map whoWillWin (helper newGames)
+                in bestFor player winners
+
+playerCounter :: Game -> Int
+playerCounter game@(board, player, _, _,_) =
+    let numericBoard = map (\(pt, plyr) -> if plyr == player then 1 else 0)
+    in foldr + numericBoard
+
+{-countMills :: Game -> Int
+countMills game@(board, player, _, _) = 
+    let millCount = -}
+
+rateGame :: Game -> Rating
+rateGame game@(board,player,_,_,_) = playerCounter player - playerCounter opponent
+
 
 
 boardToString :: String -> Board -> String
