@@ -1,3 +1,6 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Replace case with fromMaybe" #-}
+{-# HLINT ignore "Redundant return" #-}
 module Main where
 import Data.Char
 import System.IO
@@ -7,12 +10,14 @@ import Control.Monad
 import System.Console.GetOpt
 import System.Environment
 import Morrissolver
+import Distribution.Verbosity (verbose)
+import Data.String (IsString)
 
 data Phase = Set | Move | Fly deriving Eq
 -- I am adding this for the flags 
 
 --why can i not add ( maybe Int) to Depth
-data Flag = Winner | Depth String | Help | MoveF String deriving (Show, Eq)
+data Flag = Winner String | Depth String | Help String| MoveF String deriving (Show, Eq)
 
 
 
@@ -38,12 +43,33 @@ main = do
                 putStrLn "Warning: The -d flag has no effect when combined with the -w flag."
             let depth = handleDepthFlag flags
             let game = undefined --figure out later 
+            dispatch flags game
             if Winner `elem` flags
                 then do
                     let bestMAction = bestMove game --Replace with game state? Do I need to read a seperate file in? 
                     putStrLn $ "Best move: " ++ show bestMAction
                 else do 
-                    putStrLn $ "Selected depth: " ++ show depth
+                    p
+
+dispatch :: [Flag] -> Game -> IO ()
+dispatch flags game =
+   case (Winner `elem` flags,  handleMoveFlag flags, handleDepthFlag flags) of
+      (True, _, _) -> winnerAction game verb
+      (_, (True, Nothing), _ ) -> putStrLn "Invalid move flag"
+      (_, (True, Just mv), _ ) -> moveAction game mv verb
+      (_, _, Nothing) -> putStrLn "Invalid depth flag"
+      (_, _, Just depth) -> depthAction game depth veb
+   where verb = Verbose `elem` flags
+
+
+winnerAction :: (Action, Game) -> Bool -> IO ()
+winnerAction game False = putStrLn $ "Best move: " ++ show (bestMove game)
+
+moveAction game False = undefined
+
+moveAction game True = undefined
+
+depthAction game depth False = putStrLn $ "Selected depth: " ++ show depth
 
 -- checking for depth flag 
 depthFlagPresent :: Flag -> Bool
@@ -56,19 +82,25 @@ defaultDepth = 4
 
 -- handles Depth Flag
 -- default is 4 
-handleDepthFlag :: [Flag] -> Int
+handleDepthFlag :: [Flag] ->  Maybe Int
 handleDepthFlag flags =
     case [readMaybe dep | Depth dep <- flags] of
-        []        -> defaultDepth 
-        [Nothing] -> error "Invalid depth flag"
+        []        -> Just defaultDepth 
+        [Nothing] -> Nothing
         [Just dep] | dep > 0 -> dep   
-                   | otherwise -> error "Error: Depth must be a positive integer."
-        _         -> error "Error: Multiple depth values provided."
+                   | otherwise -> Nothing
+        _         -> Nothing
 --handleDepthFlag :: [Flag] -> Maybe Int
 --handleDepthFlag [] = 4
 --handleDepthFlag (Depth d:xs) = read d
 --handleDepthFlag (x:xs) = handleDepthFlag xs
-
+handleMoveFlag :: [Flag] -> (Bool, Maybe Action)
+handleMoveFlag flags =
+    case [readAction dep | MoveF dep <- flags] of
+        []        -> (False, Nothing)
+        [Nothing] -> (True, Nothing)
+        [Just mv] -> (True, Just mv)
+        _         -> (True, Nothing)
 
 -- Winner need to use bestMove and WhoWillWin 
 -- input and output for the exhaustive search should be an Action and a Game 
@@ -87,8 +119,6 @@ isThereMove _ = False
       --do let fname = if null inputs then "Board.txt" else head inputs
              --contents <- readFile fname
 
-
--- Now have to do the winner flag 
 
 placePhase :: Game -> Player -> IO ()
 placePhase game player = if getMill game then enemyRemove game (opponent player) else do
