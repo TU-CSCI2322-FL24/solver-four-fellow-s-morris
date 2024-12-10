@@ -161,6 +161,9 @@ getPlayer (_,a,_,_,_) = a
 getMill :: Game -> Bool
 getMill (_,_,_,a,_) = a
 
+getTurnCounter :: Game -> TurnCounter
+getTurnCounter (_,_,_,_,a) = a
+
 isLegalMove :: Board -> Place -> Bool
 isLegalMove board move = move `elem` board
 
@@ -282,8 +285,8 @@ bestMove (mv,game) =
             Over winner -> fst turn
             Ongoing ->
                 let moves = allPossibleMoves game
-                    --newGames = [(move, makeMove game move) | move <- moves]
-                    newGames = [(Move, game)]
+                    newGames = [(move, makeMove game move) | move <- moves]
+                    --newGames = [(moves, game)]
                     newGameWinners = map (\(m, g) -> (m, gameWinner g)) newGames
                     --bests = map bestMove newGames
                     winners = map whoWillWin (helper newGames)
@@ -300,8 +303,7 @@ countMills game@(board, player, _, _) =
     let millCount = -}
 
 rateGame :: Game -> Rating
-rateGame game@(board,player,_,_,_) = playerCounter player - playerCounter opponent
-
+rateGame game@(board,player,_,_,_) = playerCounter game - playerCounter (board, opponent player, getPhase game, getMill game, getTurnCounter game)
 
 
 boardToString :: String -> Board -> String
