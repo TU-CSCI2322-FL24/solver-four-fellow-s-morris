@@ -262,6 +262,12 @@ bestFor player winners
 helper :: [(a,b)] -> [b]
 helper lst = [snd b | b <- lst]
 
+bestMoveFor :: Player -> [(Action, Winner)] -> Action
+bestMoveFor player newGameWinners
+    | Win player `elem` helper newGameWinners = fst (head (filter (\(a, w) -> w == Win player) newGameWinners))
+    | Tie `elem` helper newGameWinners = fst (head (filter (\(a, w) -> w == Tie) newGameWinners))
+    | otherwise = fst (head newGameWinners)
+
 bestMove :: (Action,Game) -> Action
 bestMove (mv,game) =
     let turn = (mv,game)
@@ -270,15 +276,18 @@ bestMove (mv,game) =
             Over winner -> fst turn
             Ongoing ->
                 let moves = allPossibleMoves game
-                    newGames = [(move, makeMove game move) | move <- moves]
-                    bests = map bestMove newGames
+                    --newGames = [(move, makeMove game move) | move <- moves]
+                    newGames = [(Move, game)]
+                    newGameWinners = map (\(m, g) -> whoWillWin g) newGames
+                    --bests = map bestMove newGames
                     winners = map whoWillWin (helper newGames)
-                in bestFor player winners
+                in bestMoveFor (getPlayer game) newGameWinners
+                     --bestFor player winners
 
 playerCounter :: Game -> Int
 playerCounter game@(board, player, _, _,_) =
     let numericBoard = map (\(pt, plyr) -> if plyr == player then 1 else 0)
-    in foldr + numericBoard
+    in sum fst numericBoard
 
 {-countMills :: Game -> Int
 countMills game@(board, player, _, _) = 
