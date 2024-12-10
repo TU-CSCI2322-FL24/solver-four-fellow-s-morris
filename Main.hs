@@ -3,10 +3,10 @@ import Data.Char
 import System.IO
 import Data.Maybe
 import Text.Read
-import Morrissolver
 import Control.Monad
 import System.Console.GetOpt
 import System.Environment
+import Morrissolver
 
 data Phase = Set | Move | Fly deriving Eq
 -- I am adding this for the flags 
@@ -23,6 +23,7 @@ options=[ Option ['w'] ["winner"] (NoArg Winner) "Print out the best move, using
         , Option ['m'] ["move"] (ReqArg MoveF "<move>") "Should apply <move> and print out the resulting board"
 
         ]
+
 
 
 
@@ -107,14 +108,9 @@ placePhase game player = if getMill game then enemyRemove game (opponent player)
             putStrLn "Invalid move. Did you format your input as (x,y)?\nPlace a piece!\n"
             placePhase game player
 
-playerString :: Player -> String 
-playerString B = "Black"
-playerString W = "White"
-
-
 playerRemove :: Game -> Player -> IO ()
 playerRemove game player = do
-    putStrLn ("You got a mill! Select one of " ++ playerString ((opponent player)) ++ "'s pieces to remove!")
+    putStrLn ("You got a mill! Select one of " ++ playerString (Just (opponent player)) ++ "'s pieces to remove!")
     i <- getLine
     let input = map toUpper i
     if input `elem` quitInputs then quitGame else if input `elem` showBoardInputs then do
@@ -135,14 +131,14 @@ enemyPlace :: Game -> Player -> IO ()
 enemyPlace game enemy = if getMill game then playerRemove game (opponent enemy) else do 
     let legal = head [fst l | l <- legalPlaces (getBoard game)]
         g = makeMove game (Put legal)
-    putStrLn ("Player " ++ playerString (enemy) ++ " placed a piece at " ++ show legal ++ "\n\nYour turn!\n")
+    putStrLn ("Player " ++ playerString (Just enemy) ++ " placed a piece at " ++ show legal ++ "\n\nYour turn!\n")
     placePhase g (opponent enemy)
 
 enemyRemove :: Game -> Player -> IO ()
 enemyRemove game enemy = do
     let plyPieces = head [fst l | l <- getPlayerPlaces game (Just (opponent enemy))]
         g = makeMove game (Remove plyPieces)
-    putStrLn ("Player " ++ playerString (enemy) ++ " removed your piece at " ++ show plyPieces ++ "\n\nYour turn!\n")
+    putStrLn ("Player " ++ playerString (Just enemy) ++ " removed your piece at " ++ show plyPieces ++ "\n\nYour turn!\n")
     placePhase g (opponent enemy)
 
 quitInputs :: [String]
