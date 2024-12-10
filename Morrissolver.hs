@@ -8,6 +8,7 @@ import System.IO
 import System.Directory (renameFile)
 import Data.Maybe
 import Data.List
+import System.Console.ANSI (Color(White, Black))
 
 data Player = B | W deriving (Eq, Show)
 
@@ -258,6 +259,10 @@ whoWillWin game@(board,player,_,_,_)  =
                 else if all (== Just (opponent player)) winners
                     then Just (opponent player) 
                     else Nothing-}
+bestMoveFor:: Player -> [(Winner, Action)] -> Action
+bestMoveFor player winMoves=
+    case (lookup (Win player) winMoves, lookup Tie winMoves ) of
+        (Just winMove, _) -> winMove --fill in the rest later 
 
 bestFor :: Player -> [Winner] -> Winner
 bestFor player winners
@@ -269,29 +274,27 @@ helper :: [(a,b)] -> [b]
 helper lst = [snd b | b <- lst]
 
 bestMove :: (Action,Game) -> Action
-bestMove (mv,game) =
-    let turn = (mv,game)
-    in
+bestMove (mv,game@(brd, pl, phase, remove, turnC)) =
         case gameWinner game of
-            Over winner -> fst turn
+            Over winner -> mv
             Ongoing ->
                 let moves = allPossibleMoves game
                     newGames = [(move, makeMove game move) | move <- moves]
                     bests = map bestMove newGames
-                    winners = map whoWillWin (helper newGames)
-                in bestFor player winners
+                    winners = [(whoWillWin game, move)| (move, game) <- newGames ]
+                in bestMoveFor pl winners
 
-playerCounter :: Game -> Int
-playerCounter game@(board, player, _, _,_) =
-    let numericBoard = map (\(pt, plyr) -> if plyr == player then 1 else 0)
-    in foldr + numericBoard
+playerCounter :: Player -> Board-> Int
+playerCounter player board =
+    let numericBoard = filter  (\(pt, plyr) ->  plyr == Just player) board
+    in length (numericBoard)
 
 {-countMills :: Game -> Int
 countMills game@(board, player, _, _) = 
     let millCount = -}
 
 rateGame :: Game -> Rating
-rateGame game@(board,player,_,_,_) = playerCounter player - playerCounter opponent
+rateGame game@(board,player,_,_,_) = playerCounter W board - playerCounter B board
 
 
 

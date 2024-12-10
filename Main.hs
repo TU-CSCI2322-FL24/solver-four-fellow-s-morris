@@ -4,7 +4,7 @@ import System.IO
 import Data.Maybe
 import Text.Read
 import Morrissolver
-import Control.Monad ()
+import Control.Monad
 import System.Console.GetOpt
 import System.Environment
 
@@ -13,6 +13,7 @@ data Phase = Set | Move | Fly deriving Eq
 
 --why can i not add ( maybe Int) to Depth
 data Flag = Winner | Depth String | Help | MoveF String deriving (Show, Eq)
+
 
 
 options :: [OptDescr Flag]
@@ -35,9 +36,10 @@ main = do
             when (Winner `elem` flags && any depthFlagPresent flags) $
                 putStrLn "Warning: The -d flag has no effect when combined with the -w flag."
             let depth = handleDepthFlag flags
+            let game = undefined --figure out later 
             if Winner `elem` flags
                 then do
-                    let bestMAction = bestMove initialGame --Replace with game state? Do I need to read a seperate file in? 
+                    let bestMAction = bestMove game --Replace with game state? Do I need to read a seperate file in? 
                     putStrLn $ "Best move: " ++ show bestMAction
                 else do 
                     putStrLn $ "Selected depth: " ++ show depth
@@ -53,12 +55,13 @@ defaultDepth = 4
 
 -- handles Depth Flag
 -- default is 4 
+handleDepthFlag :: [Flag] -> Int
 handleDepthFlag flags =
-    case [dep | Depth dep <- flags] of
+    case [readMaybe dep | Depth dep <- flags] of
         []        -> defaultDepth 
-        [Nothing] -> defaultDepth 
+        [Nothing] -> error "Invalid depth flag"
         [Just dep] | dep > 0 -> dep   
-        [Just dep]  -> error "Error: Depth must be a positive integer."
+                   | otherwise -> error "Error: Depth must be a positive integer."
         _         -> error "Error: Multiple depth values provided."
 --handleDepthFlag :: [Flag] -> Maybe Int
 --handleDepthFlag [] = 4
@@ -70,7 +73,7 @@ handleDepthFlag flags =
 -- input and output for the exhaustive search should be an Action and a Game 
 
 --handles the Move Flag
-isThereMove :: [Flag] -> Bool
+isThereMove :: Flag -> Bool
 isThereMove (MoveF _) = True
 isThereMove _ = False
 
@@ -104,9 +107,14 @@ placePhase game player = if getMill game then enemyRemove game (opponent player)
             putStrLn "Invalid move. Did you format your input as (x,y)?\nPlace a piece!\n"
             placePhase game player
 
+playerString :: Player -> String 
+playerString B = "Black"
+playerString W = "White"
+
+
 playerRemove :: Game -> Player -> IO ()
 playerRemove game player = do
-    putStrLn ("You got a mill! Select one of " ++ playerString (Just (opponent player)) ++ "'s pieces to remove!")
+    putStrLn ("You got a mill! Select one of " ++ playerString ((opponent player)) ++ "'s pieces to remove!")
     i <- getLine
     let input = map toUpper i
     if input `elem` quitInputs then quitGame else if input `elem` showBoardInputs then do
@@ -127,14 +135,14 @@ enemyPlace :: Game -> Player -> IO ()
 enemyPlace game enemy = if getMill game then playerRemove game (opponent enemy) else do 
     let legal = head [fst l | l <- legalPlaces (getBoard game)]
         g = makeMove game (Put legal)
-    putStrLn ("Player " ++ playerString (Just enemy) ++ " placed a piece at " ++ show legal ++ "\n\nYour turn!\n")
+    putStrLn ("Player " ++ playerString (enemy) ++ " placed a piece at " ++ show legal ++ "\n\nYour turn!\n")
     placePhase g (opponent enemy)
 
 enemyRemove :: Game -> Player -> IO ()
 enemyRemove game enemy = do
     let plyPieces = head [fst l | l <- getPlayerPlaces game (Just (opponent enemy))]
         g = makeMove game (Remove plyPieces)
-    putStrLn ("Player " ++ playerString (Just enemy) ++ " removed your piece at " ++ show plyPieces ++ "\n\nYour turn!\n")
+    putStrLn ("Player " ++ playerString (enemy) ++ " removed your piece at " ++ show plyPieces ++ "\n\nYour turn!\n")
     placePhase g (opponent enemy)
 
 quitInputs :: [String]
