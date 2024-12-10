@@ -4,7 +4,162 @@ import System.IO
 import Data.Maybe
 import Text.Read
 import Morrissolver
-import Control.Monad
+import Control.Monad ()
+import System.Console.GetOpt
+import System.Environment
+
+data Phase = Set | Move | Fly deriving Eq
+-- I am adding this for the flags 
+
+--why can i not add ( maybe Int) to Depth
+data Flag = Winner | Depth String | Help | MoveF String deriving (Show, Eq)
+
+
+options :: [OptDescr Flag]
+options=[ Option ['w'] ["winner"] (NoArg Winner) "Print out the best move, using the exhaustive search"
+        , Option ['d'] ["depth"] (ReqArg Depth "<num>") "Specify <num> as a cutoff depth, instead of our default"
+        , Option ['h'] ["help"] (NoArg Help) "Print out a good help function and quit the program"
+        , Option ['m'] ["move"] (ReqArg MoveF "<move>") "Should apply <move> and print out the resulting board"
+
+        ]
+
+
+
+main :: IO ()
+main = do
+    args <- getArgs
+    let (flags, inputs, errors) = getOpt Permute options args
+    if Help `elem` flags || not (null errors) 
+        then putStrLn $ usageInfo "Morris [options] filename" options
+        else do 
+            when (Winner `elem` flags && any depthFlagPresent flags) $
+                putStrLn "Warning: The -d flag has no effect when combined with the -w flag."
+            let depth = handleDepthFlag flags
+            if Winner `elem` flags
+                then do
+                    let bestMAction = bestMove initialGame --Replace with game state? Do I need to read a seperate file in? 
+                    putStrLn $ "Best move: " ++ show bestMAction
+                else do 
+                    putStrLn $ "Selected depth: " ++ show depth
+
+-- checking for depth flag 
+depthFlagPresent :: Flag -> Bool
+depthFlagPresent (Depth _) = True
+depthFlagPresent _ = False 
+
+-- default depth
+defaultDepth :: Int
+defaultDepth = 4 
+
+-- handles Depth Flag
+-- default is 4 
+handleDepthFlag flags =
+    case [dep | Depth dep <- flags] of
+        []        -> defaultDepth 
+        [Nothing] -> defaultDepth 
+        [Just dep] | dep > 0 -> dep   
+        [Just dep]  -> error "Error: Depth must be a positive integer."
+        _         -> error "Error: Multiple depth values provided."
+--handleDepthFlag :: [Flag] -> Maybe Int
+--handleDepthFlag [] = 4
+--handleDepthFlag (Depth d:xs) = read d
+--handleDepthFlag (x:xs) = handleDepthFlag xs
+
+
+-- Winner need to use bestMove and WhoWillWin 
+-- input and output for the exhaustive search should be an Action and a Game 
+
+--handles the Move Flag
+isThereMove :: [Flag] -> Bool
+isThereMove (MoveF _) = True
+isThereMove _ = False
+
+--Part of the orginal main before 
+  --do args <- getArgs
+     --let (flags, inputs, errors) = getOpt Permute options args
+     --if Help `elem` flags || not (null errors) 
+     --then putStrLn $ usageInfo "Morris [options] [filename]" options
+     --else 
+      --do let fname = if null inputs then "Board.txt" else head inputs
+             --contents <- readFile fname
+
+
+-- Now have to do the winner flag 
+
+placePhase :: Game -> Player -> IO ()
+placePhase game player = if getMill game then enemyRemove game (opponent player) else do
+    i <- getLine
+    let input = map toUpper i
+    if input `elem` quitInputs then quitGame else if input `elem` showBoardInputs then do
+        showBoard game
+        placePhase game player
+    else do
+        let placement = parseTuple input
+            legal = [fst l | l <- legalPlaces (getBoard game)]
+        if placement `elem` legal then do
+            let g = makeMove game (Put placement)
+            putStrLn ("Placed a piece at " ++ show placement ++ "\n\n")
+            enemyPlace g (opponent player)
+        else do
+            putStrLn "Invalid move. Did you format your input as (x,y)?\nPlace a piece!\n"
+            placePhase game player
+
+playerRemove :: Game -> Player -> IO ()
+playerRemove game player = do
+    putStrLn ("You got a mill! Select one of " ++ playerString (Just (opponent player)) ++ "'s pieces to remove!")
+    i <- getLine
+    let input = map toUpper i
+    if input `elem` quitInputs then quitGame else if input `elem` showBoardInputs then do
+        showBoard game
+        playerRemove game player
+    else do
+        let placement = parseTuple input
+            legal = [fst l | l <- getPlayerPlaces game (Just (opponent player))]
+        if placement `elem` legal then do
+            let g = makeMove game (Remove placement)
+            putStrLn ("Removed piece at " ++ show placement ++ "\n\n")
+            enemyPlace g (opponent player)
+        else do
+            putStrLn "Invalid move. Did you format your input as (x,y)?\nRemove a piece!\n"
+            playerRemove game player
+
+enemyPlace :: Game -> Player -> IO ()
+enemyPlace game enemy = if getMill game then playerRemove game (opponent enemy) else do 
+    let legal = head [fst l | l <- legalPlaces (getBoard game)]
+        g = makeMove game (Put legal)
+    putStrLn ("Player " ++ playerString (Just enemy) ++ " placed a piece at " ++ show legal ++ "\n\nYour turn!\n")
+    placePhase g (opponent enemy)
+
+enemyRemove :: Game -> Player -> IO ()
+enemyRemove game enemy = do
+    let plyPieces = head [fst l | l <- getPlayerPlaces game (Just (opponent enemy))]
+        g = makeMove game (Remove plyPieces)
+    putStrLn ("Player " ++ playerString (Just enemy) ++ " removed your piece at " ++ show plyPieces ++ "\n\nYour turn!\n")
+    placePhase g (opponent enemy)
+
+quitInputs :: [String]
+quitInputs = ["QUIT", "Q", "EXIT", "END"]
+
+showBoardInputs :: [String]
+showBoardInputs = ["BOARD", "STATE", "GAME", "G", "SHOW"]
+
+showBoard :: Game -> IO ()
+showBoard game = putStrLn ("\n" ++ prettyPrint game)
+
+quitGame :: IO ()
+quitGame = putStrLn "Goodbye"
+
+parseTuple :: String -> Point
+parseTuple s =
+    let trimmed = filter (`notElem` " ()") s
+    in case break (== ',') trimmed of
+        (aStr, ',' : bStr) ->
+            case (readMaybe aStr, readMaybe bStr) of
+                (Just intA, Just intB) -> (intA, intB)
+                _ -> (99999, 99999)
+        _ -> (99999, 99999)
+
+{-
 
 data Phase = Set | Move | Fly deriving Eq
 
@@ -94,7 +249,6 @@ printBoard board = do
 toPlayer :: String -> Player
 toPlayer "B" = B
 toPlayer "W" = W
-toPlayer _ = O
 
 parseTuple :: String -> Point
 parseTuple s = 
@@ -135,4 +289,4 @@ applyInput input board =
         printBoard board
 
 defaultBoard :: Board
-defaultBoard = makeBoard allPoints
+defaultBoard = makeBoard allPoints -}
