@@ -50,6 +50,7 @@ type Rating = Int
 -- Phase 2/3, removing
 --Int tells us how many pieces we have 
 --Bool is if last piece made a mill or not and then we wwant to remove
+
 type Phase = Int -- bool?
 type TurnCounter = Int
 
@@ -87,7 +88,7 @@ allEdges =
     in forward ++ [(b,a) | (a,b) <- forward]
 
 
-allMills:: [[Point]]
+
 allMills = [ [(1,1), (1,4), (1,7)],
              [(2,2), (2,4), (2,6)],
              [(3,3), (3,4), (3,5)],
@@ -106,6 +107,7 @@ allMills = [ [(1,1), (1,4), (1,7)],
              [(1,7), (4,7), (7,7)] ]
 
 
+
 -- need to keep track of mills
 -- wanna check after every turn if we have a mill
 -- can do this by checking if there are two edges that are conected 
@@ -117,6 +119,10 @@ isMill pieceLoc board pl =
     let adjacentMills = [mill | mill <- allMills, pieceLoc `elem` mill]
         playerFilled = all (\l -> lookup l board == Just pl)
     in any playerFilled adjacentMills
+
+
+
+
 
 --determine who is gonna win the game 
 --either the oppnoet only has 2 pices left or they have no more legal moves 
@@ -208,10 +214,10 @@ legalPlaces :: Board -> [Place]
 legalPlaces board = [place | place <- board, isOpen place]
 
 
---Need to add error checking to make sure point is a legal point and on an open space in the board
---Is there a way to set a default value?
---Do we need to change this in order to make it incorporate a game return as opposed to board?
---We need to rewrite this function tbh
+
+
+-- did pattern match instead as well as included the error handling \
+-- add +1 for every turn and once get to 200 the game should output end 
 makeMove :: Game -> Action -> Game
 makeMove game@(board, player, phase, True, 200) _ = error "Game is over!"
 makeMove game@(board, player, phase, True, turns) (Remove point) =
