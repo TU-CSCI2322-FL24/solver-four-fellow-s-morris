@@ -278,7 +278,7 @@ bestMove (mv,game) =
                 let moves = allPossibleMoves game
                     --newGames = [(move, makeMove game move) | move <- moves]
                     newGames = [(Move, game)]
-                    newGameWinners = map (\(m, g) -> whoWillWin g) newGames
+                    newGameWinners = map (\(m, g) -> (m, gameWinner g)) newGames
                     --bests = map bestMove newGames
                     winners = map whoWillWin (helper newGames)
                 in bestMoveFor (getPlayer game) newGameWinners
