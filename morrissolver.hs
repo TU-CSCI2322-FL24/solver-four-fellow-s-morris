@@ -8,6 +8,7 @@ import System.IO
 import System.Directory (renameFile)
 import Data.Maybe
 import Data.List
+import Data.Colour.CIE.Illuminant (b)
 
 data Player = B | W deriving (Eq, Show)
 
@@ -149,21 +150,6 @@ orderedPoints = [(1,7), (4,7), (7,7), (2,6), (6,6), (3,5), (4,5), (5,5),
 makeBoard :: [Point] -> Board
 makeBoard allPoints = [(x, Nothing) | x <- allPoints]
 
-getBoard :: Game -> Board
-getBoard (a,_,_,_,_) = a
-
-getPhase :: Game -> Phase
-getPhase (_,_,a,_,_) = a
-
-getPlayer :: Game -> Player
-getPlayer (_,a,_,_,_) = a
-
-getMill :: Game -> Bool
-getMill (_,_,_,a,_) = a
-
-getTurnCounter :: Game -> TurnCounter
-getTurnCounter (_,_,_,_,a) = a
-
 isLegalMove :: Board -> Place -> Bool
 isLegalMove board move = move `elem` board
 
@@ -172,9 +158,8 @@ isOpen ((a,b), c) = isNothing c
 
 --Create function to check if a player is black or white, or one that returns the type of a player
 getPlayerPlaces :: Game -> Maybe Player -> [Place]
-getPlayerPlaces game player =
-    let board = getBoard game
-    in filter (\(a,b) -> b == player) board
+getPlayerPlaces game@(board, _, _,_,_) player =
+    [place | place <- board, snd place == player]
 
 getEmptyPlaces :: Game -> [Place]
 getEmptyPlaces game = getPlayerPlaces game Nothing
@@ -242,7 +227,6 @@ makeMove game@(board, player, 2, False, turns) (Move (from, to)) =
 
 makeMove _ _ = error "Invalid action"
 
---Need to adjust types
 allPossibleMoves :: Game -> [Action]
 allPossibleMoves game@(board, player, phase, False, _) = legalActions game
 allPossibleMoves game@(board, player, phase, True, _) =
@@ -256,11 +240,7 @@ whoWillWin game@(board,player,_,_,_)  =
             let moves = allPossibleMoves game
                 newGames = [makeMove game move | move <- moves]
                 winners = map whoWillWin newGames
-            in bestFor player winners {-if Just player `elem` winners
-                then Just player
-                else if all (== Just (opponent player)) winners
-                    then Just (opponent player) 
-                    else Nothing-}
+            in bestFor player winners
 
 bestFor :: Player -> [Winner] -> Winner
 bestFor player winners
@@ -271,39 +251,49 @@ bestFor player winners
 helper :: [(a,b)] -> [b]
 helper lst = [snd b | b <- lst]
 
-bestMoveFor :: Player -> [(Action, Winner)] -> Action
-bestMoveFor player newGameWinners
-    | Win player `elem` helper newGameWinners = fst (head (filter (\(a, w) -> w == Win player) newGameWinners))
-    | Tie `elem` helper newGameWinners = fst (head (filter (\(a, w) -> w == Tie) newGameWinners))
-    | otherwise = fst (head newGameWinners)
+bestMove :: (Action,Game) -> Maybe Action
+bestMove (mv,game@(board, player, _,_,_)) =
+    case gameWinner game of
+        Over winner -> if winner ==  Win player then Just mv else Nothing
+        Ongoing ->
+            let moves = allPossibleMoves game
+                newGames = [(move, makeMove game move) | move <- moves]
+                bests = map bestMove newGames
+            in Just (head (catMaybes bests))
 
-bestMove :: (Action,Game) -> Action
-bestMove (mv,game) =
-    let turn = (mv,game)
-    in
-        case gameWinner game of
-            Over winner -> fst turn
-            Ongoing ->
-                let moves = allPossibleMoves game
-                    newGames = [(move, makeMove game move) | move <- moves]
-                    --newGames = [(moves, game)]
-                    newGameWinners = map (\(m, g) -> (m, gameWinner g)) newGames
-                    --bests = map bestMove newGames
-                    winners = map whoWillWin (helper newGames)
-                in bestMoveFor (getPlayer game) newGameWinners
-                     --bestFor player winners
+count :: [a] -> Int
+count [] = 0
+count (x:xs) = 1 + count xs
 
-playerCounter :: Game -> Int
-playerCounter game@(board, player, _, _,_) =
-    let numericBoard = map (\(pt, plyr) -> if plyr == player then 1 else 0)
-    in sum fst numericBoard
-
-{-countMills :: Game -> Int
-countMills game@(board, player, _, _) = 
-    let millCount = -}
+playerCounter :: Game -> Player -> Int
+playerCounter game@(board, _, _, _,_) player =
+    let countPlayer = getPlayerPlaces game (Just player)
+    in count countPlayer
 
 rateGame :: Game -> Rating
-rateGame game@(board,player,_,_,_) = playerCounter game - playerCounter (board, opponent player, getPhase game, getMill game, getTurnCounter game)
+rateGame game@(board,player,phase,_,turn) = playerCounter game player - playerCounter game (opponent player)
+
+maximizer :: [(Game,Bool,Rating,Action)] -> (Game,Bool,Rating,Action) -> (Game,Bool,Rating,Action)
+maximizer [] maxQuad = maxQuad
+maximizer (x@(_, b, c1, _):xs) maxQuad@(_, _, c2, _)
+  | b         = x
+  | otherwise = maximizer xs (bigger x maxQuad)
+  where
+    bigger thing1@(_, _, c1, _) thing2@(_, _, c2, _) = 
+        if c1 > c2 then thing1 else thing2
+
+whoMightWin :: Game -> Action -> Int -> Maybe (Rating, Action)
+whoMightWin game@(board, player, _, _, _) mv depth =
+    case gameWinner game of
+        Over winner -> if winner ==  Win player then Just (rateGame game,mv) else Nothing
+        Ongoing ->
+            let moves = allPossibleMoves game
+                newGames = [(move, makeMove game move) | move <- moves]
+                ratedGames = map (\(mv, gm) -> rateGame gm) newGames
+                wonGames = map (\(m,g) -> gameWinner g == Over (Win player)) newGames
+                newRatedGames = [(g,gameWinner g == Over (Win player),rateGame g,m) | (m,g) <- newGames]
+                bestGame@(g,b,r,m) = maximizer newRatedGames (head newRatedGames)
+            in  whoMightWin g m (depth + 1)
 
 
 boardToString :: String -> Board -> String
