@@ -52,14 +52,35 @@ main = do
                     p
 
 dispatch :: [Flag] -> Game -> IO ()
-dispatch flags game =
-   case (Winner `elem` flags,  handleMoveFlag flags, handleDepthFlag flags) of
-      (True, _, _) -> winnerAction game verb
-      (_, (True, Nothing), _ ) -> putStrLn "Invalid move flag"
-      (_, (True, Just mv), _ ) -> moveAction game mv verb
-      (_, _, Nothing) -> putStrLn "Invalid depth flag"
-      (_, _, Just depth) -> depthAction game depth veb
-   where verb = Verbose `elem` flags
+dispatch flags game = do
+    -- Handle the Winner flag
+    when (Winner `elem` flags) $ winnerAction game (Verbose `elem` flags)
+
+    -- Handle the Depth flag
+    let depth = handleDepthFlag flags
+    case depth of
+        Nothing -> putStrLn "Invalid depth flag"
+        Just d  -> depthAction game d (Verbose `elem` flags)
+
+    -- Handle the Move flag
+    let (moveFlagPresent, move) = handleMoveFlag flags
+    when moveFlagPresent $ do
+        case move of
+            Just mv -> do
+                let newGame = makeMove game mv
+                if Verbose `elem` flags
+                    then do
+                        let rating = rateGame newGame
+                        putStrLn $ "Move: " ++ show mv ++ ", Rating: " ++ show rating
+                        putStrLn $ prettyPrint newGame
+                    else putStrLn $ "New board: " ++ pickle newGame
+            Nothing -> putStrLn "Invalid move format or move not allowed."
+
+    -- Handle the Interactive flag
+    when (Interactive `elem` flags) $ do
+        let depth = fromMaybe 4 $ handleDepthFlag flags
+        playGame game depth
+
 
 
 winnerAction :: (Action, Game) -> Bool -> IO ()

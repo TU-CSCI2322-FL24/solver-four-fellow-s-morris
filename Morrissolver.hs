@@ -248,6 +248,25 @@ allPossibleMoves game@(board, player, phase, False, _) = legalActions game
 allPossibleMoves game@(board, player, phase, True, _) =
      [Remove (fst pieces) | pieces <- board, snd pieces == Just (opponent player)]
 
+
+-- Decision-making logic
+whoMightWin :: Game -> Int -> (Rating, Action)
+whoMightWin game 0 = (rateGame game, undefined)
+whoMightWin game depth =
+    let moves = allPossibleMoves game
+        outcomes = [(rateGame (makeMove game move), move) | move <- moves]
+        bestOutcome =
+            if getPlayer game == B
+                then maximumBy (\(r1, _) (r2, _) -> compare r1 r2) outcomes
+                else minimumBy (\(r1, _) (r2, _) -> compare r1 r2) outcomes
+    in if fst bestOutcome == maxBound || fst bestOutcome == minBound
+        then bestOutcome
+        else whoMightWin (makeMove game (snd bestOutcome)) (depth - 1)
+
+
+
+
+
 whoWillWin :: Game -> Winner
 whoWillWin game@(board,player,_,_,_)  =
     case gameWinner game of

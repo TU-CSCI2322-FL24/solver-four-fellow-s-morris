@@ -7,6 +7,7 @@ Colin Johnson,
 Edwin Leal,
 Jake Borawski,
 Marlo Zamora
+Cole Conway
 
 
 NOTE: Should be "Four Fellow's Morris"
