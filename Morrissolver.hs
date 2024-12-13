@@ -250,18 +250,18 @@ allPossibleMoves game@(board, player, phase, True, _) =
 
 
 -- Decision-making logic
-whoMightWin :: Game -> Int -> (Rating, Action)
-whoMightWin game 0 = (rateGame game, undefined)
+whoMightWin :: Game -> Int -> (Rating, Maybe Action)
+whoMightWin game 0 = (rateGame game, Nothing)
 whoMightWin game depth =
     let moves = allPossibleMoves game
-        outcomes = [(rateGame (makeMove game move), move) | move <- moves]
+        outcomes = [(rateGame (makeMove game move), Just move) | move <- moves]
         bestOutcome =
             if getPlayer game == B
                 then maximumBy (\(r1, _) (r2, _) -> compare r1 r2) outcomes
                 else minimumBy (\(r1, _) (r2, _) -> compare r1 r2) outcomes
     in if fst bestOutcome == maxBound || fst bestOutcome == minBound
         then bestOutcome
-        else whoMightWin (makeMove game (snd bestOutcome)) (depth - 1)
+        else whoMightWin (makeMove game (fromJust (snd bestOutcome))) (depth - 1)
 
 
 
@@ -280,11 +280,11 @@ whoWillWin game@(board,player,_,_,_)  =
                 else if all (== Just (opponent player)) winners
                     then Just (opponent player) 
                     else Nothing-}
-bestMoveFor:: Player -> [(Winner, Action)] -> Action
+{-bestMoveFor:: Player -> [(Winner, Action)] -> Action
 bestMoveFor player winMoves=
     case (lookup (Win player) winMoves, lookup Tie winMoves ) of
         (Just winMove, _) -> winMove --fill in the rest later 
-
+-}
 bestFor :: Player -> [Winner] -> Winner
 bestFor player winners
     | Win player `elem` winners = Win player
@@ -294,28 +294,54 @@ bestFor player winners
 helper :: [(a,b)] -> [b]
 helper lst = [snd b | b <- lst]
 
-bestMove :: (Action,Game) -> Action
-bestMove (mv,game@(brd, pl, phase, remove, turnC)) =
+bestMove :: Game -> Maybe Action
+bestMove game@(board, player, phase, remove, turnC) =
         case gameWinner game of
-            Over winner -> mv
+            Over winner -> Nothing
             Ongoing ->
                 let moves = allPossibleMoves game
-                    newGames = [(move, makeMove game move) | move <- moves]
-                    bests = map bestMove newGames
-                    winners = [(whoWillWin game, move)| (move, game) <- newGames ]
-                in bestMoveFor pl winners
+                    newGames = [makeMove game move | move <- moves]
+                    winners = map whoWillWin newGames
+                    results = zip moves winners
+                in bestMoveFor results player
 
-playerCounter :: Player -> Board-> Int
-playerCounter player board =
-    let numericBoard = filter  (\(pt, plyr) ->  plyr == Just player) board
-    in length (numericBoard)
+bestMoveFor :: [(Action, Winner)] -> Player -> Maybe Action
+bestMoveFor result player =
+    let winningMoves = filter (\(a, w) -> w == Win player) result
+        tieMoves = filter (\(a,w) -> w == Tie) result
+    in if not (null winningMoves) then Just (fst (head winningMoves)) else
+        if not (null tieMoves) then Just (fst (head tieMoves)) else Nothing
 
-{-countMills :: Game -> Int
-countMills game@(board, player, _, _) = 
-    let millCount = -}
+playerCounter :: Game -> Player -> Int
+playerCounter game@(board, _, _, _,_) player =
+    let countPlayer = getPlayerPlaces game (Just player)
+    in length countPlayer
 
 rateGame :: Game -> Rating
-rateGame game@(board,player,_,_,_) = playerCounter W board - playerCounter B board
+rateGame game@(board,player,phase,_,turn) = playerCounter game player - playerCounter game (opponent player)
+
+{-maximizer :: [(Game,Bool,Rating,Action)] -> (Game,Bool,Rating,Action) -> (Game,Bool,Rating,Action)
+maximizer [] maxQuad = maxQuad
+maximizer (x@(_, b, c1, _):xs) maxQuad@(_, _, c2, _)
+  | b         = x
+  | otherwise = maximizer xs (bigger x maxQuad)
+  where
+    bigger thing1@(_, _, c1, _) thing2@(_, _, c2, _) = 
+        if c1 > c2 then thing1 else thing2
+
+whoMightWin :: Game -> Action -> Int -> Maybe (Rating, Action)
+whoMightWin game@(board, player, _, _, _) mv depth =
+    case gameWinner game of
+        Over winner -> if winner ==  Win player then Just (rateGame game,mv) else Nothing
+        Ongoing ->
+            let moves = allPossibleMoves game
+                newGames = [(move, makeMove game move) | move <- moves]
+                ratedGames = map (\(mv, gm) -> rateGame gm) newGames
+                wonGames = map (\(m,g) -> gameWinner g == Over (Win player)) newGames
+                newRatedGames = [(g,gameWinner g == Over (Win player),rateGame g,m) | (m,g) <- newGames]
+                bestGame@(g,b,r,m) = maximizer newRatedGames (head newRatedGames)
+            in  whoMightWin g m (depth + 1)
+-}
 
 boardToString :: String -> Board -> String
 boardToString boardString board =
@@ -384,16 +410,16 @@ testOut g = putStrLn (prettyPrint g)
 
 --String that is put in file
 pickle :: Game -> String
-pickle (board, player, phase, mill, turn) = 
-    [playerChar (snd s) | s <- board] ++ " " 
-    ++ playerString (Just player) ++ " " 
-    ++ show phase ++ " " 
+pickle (board, player, phase, mill, turn) =
+    [playerChar (snd s) | s <- board] ++ " "
+    ++ playerString (Just player) ++ " "
+    ++ show phase ++ " "
     ++ show mill ++ " "
     ++ show turn
 
 --Game that is read out
 unpickle :: String -> Game
-unpickle string = 
+unpickle string =
     let [b, pl, ph, m, t] = splitOn " " string
         board  = zip allPoints [stringPlayer [x] | x <- b]
         player = stringPlayer pl
