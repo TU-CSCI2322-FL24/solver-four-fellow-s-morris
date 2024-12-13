@@ -8,7 +8,7 @@ import System.IO
 import System.Directory (renameFile)
 import Data.Maybe
 import Data.List
-import Data.List.Split
+import Data.Colour.CIE.Illuminant (b)
 
 data Player = B | W deriving (Eq, Show)
 
@@ -58,10 +58,18 @@ type TurnCounter = Int
 type Game = (Board, Player, Phase, Bool, TurnCounter)
 
 
+initialG :: ([Place], Player, Int, Bool, Int)
+initialG = (initialB, W, 1, False, 0)
+
+initialB :: [Place]
+initialB = [(pnt, Nothing)| pnt <- allPoints]
+
+
 allPoints :: [Point]
 allPoints = [(1,7), (1,4), (1,1), (2,6), (2,4), (2,2), (3,5),
             (3,4), (3,3), (4,7), (4,5), (4,3), (4,1), (5,5),
             (5,4), (5,3), (6,6), (6,4), (6,2), (7,7), (7,4), (7,1)]
+
 
 -- there must be an easier way then hardcoding all the 
 -- when have a mill can remove those edges 
@@ -107,9 +115,6 @@ allMills = [ [(1,1), (1,4), (1,7)],
              [(1,7), (4,7), (7,7)] ]
 
 
-newGame :: Player -> Game
-newGame player = (makeBoard allPoints, player, 1, False, 0)
-
 
 -- need to keep track of mills
 -- wanna check after every turn if we have a mill
@@ -152,18 +157,6 @@ orderedPoints = [(1,7), (4,7), (7,7), (2,6), (6,6), (3,5), (4,5), (5,5),
 makeBoard :: [Point] -> Board
 makeBoard allPoints = [(x, Nothing) | x <- allPoints]
 
-getBoard :: Game -> Board
-getBoard (a,_,_,_,_) = a
-
-getPhase :: Game -> Phase
-getPhase (_,_,a,_,_) = a
-
-getPlayer :: Game -> Player
-getPlayer (_,a,_,_,_) = a
-
-getMill :: Game -> Bool
-getMill (_,_,_,a,_) = a
-
 isLegalMove :: Board -> Place -> Bool
 isLegalMove board move = move `elem` board
 
@@ -172,9 +165,8 @@ isOpen ((a,b), c) = isNothing c
 
 --Create function to check if a player is black or white, or one that returns the type of a player
 getPlayerPlaces :: Game -> Maybe Player -> [Place]
-getPlayerPlaces game player =
-    let board = getBoard game
-    in filter (\(a,b) -> b == player) board
+getPlayerPlaces game@(board, _, _,_,_) player =
+    [place | place <- board, snd place == player]
 
 getEmptyPlaces :: Game -> [Place]
 getEmptyPlaces game = getPlayerPlaces game Nothing
@@ -242,7 +234,6 @@ makeMove game@(board, player, 2, False, turns) (Move (from, to)) =
 
 makeMove _ _ = error "Invalid action"
 
---Need to adjust types
 allPossibleMoves :: Game -> [Action]
 allPossibleMoves game@(board, player, phase, False, _) = legalActions game
 allPossibleMoves game@(board, player, phase, True, _) =
@@ -256,15 +247,7 @@ whoWillWin game@(board,player,_,_,_)  =
             let moves = allPossibleMoves game
                 newGames = [makeMove game move | move <- moves]
                 winners = map whoWillWin newGames
-            in bestFor player winners {-if Just player `elem` winners
-                then Just player
-                else if all (== Just (opponent player)) winners
-                    then Just (opponent player) 
-                    else Nothing-}
-bestMoveFor:: Player -> [(Winner, Action)] -> Action
-bestMoveFor player winMoves=
-    case (lookup (Win player) winMoves, lookup Tie winMoves ) of
-        (Just winMove, _) -> winMove --fill in the rest later 
+            in bestFor player winners
 
 bestFor :: Player -> [Winner] -> Winner
 bestFor player winners
@@ -275,28 +258,50 @@ bestFor player winners
 helper :: [(a,b)] -> [b]
 helper lst = [snd b | b <- lst]
 
-bestMove :: (Action,Game) -> Action
-bestMove (mv,game@(brd, pl, phase, remove, turnC)) =
-        case gameWinner game of
-            Over winner -> mv
-            Ongoing ->
-                let moves = allPossibleMoves game
-                    newGames = [(move, makeMove game move) | move <- moves]
-                    bests = map bestMove newGames
-                    winners = [(whoWillWin game, move)| (move, game) <- newGames ]
-                in bestMoveFor pl winners
+bestMove :: (Game) -> Maybe Action
+bestMove (game@(board, player, _,_,_)) =
+    case gameWinner game of
+        Over winner -> Nothing--if winner ==  Win player then Just mv else Nothing
+        Ongoing ->
+            let moves = allPossibleMoves game
+                newGames = [(move, makeMove game move) | move <- moves]
+                bests = [(whoWillWin game, move) | (move, game) <- newGames ]
+            in undefined -- this where we would write bestMoveFor 
 
-playerCounter :: Player -> Board-> Int
-playerCounter player board =
-    let numericBoard = filter  (\(pt, plyr) ->  plyr == Just player) board
-    in length (numericBoard)
+count :: [a] -> Int
+count [] = 0
+count (x:xs) = 1 + count xs
 
-{-countMills :: Game -> Int
-countMills game@(board, player, _, _) = 
-    let millCount = -}
+playerCounter :: Game -> Player -> Int
+playerCounter game@(board, _, _, _,_) player =
+    let countPlayer = getPlayerPlaces game (Just player)
+    in count countPlayer
 
 rateGame :: Game -> Rating
-rateGame game@(board,player,_,_,_) = playerCounter W board - playerCounter B board
+rateGame game@(board,player,phase,_,turn) = playerCounter game player - playerCounter game (opponent player)
+
+maximizer :: [(Game,Bool,Rating,Action)] -> (Game,Bool,Rating,Action) -> (Game,Bool,Rating,Action)
+maximizer [] maxQuad = maxQuad
+maximizer (x@(_, b, c1, _):xs) maxQuad@(_, _, c2, _)
+  | b         = x
+  | otherwise = maximizer xs (bigger x maxQuad)
+  where
+    bigger thing1@(_, _, c1, _) thing2@(_, _, c2, _) = 
+        if c1 > c2 then thing1 else thing2
+
+whoMightWin :: Game -> Action -> Int -> Maybe (Rating, Action)
+whoMightWin game@(board, player, _, _, _) mv depth =
+    case gameWinner game of
+        Over winner -> if winner ==  Win player then Just (rateGame game,mv) else Nothing
+        Ongoing ->
+            let moves = allPossibleMoves game
+                newGames = [(move, makeMove game move) | move <- moves]
+                ratedGames = map (\(mv, gm) -> rateGame gm) newGames
+                wonGames = map (\(m,g) -> gameWinner g == Over (Win player)) newGames
+                newRatedGames = [(g,gameWinner g == Over (Win player),rateGame g,m) | (m,g) <- newGames]
+                bestGame@(g,b,r,m) = maximizer newRatedGames (head newRatedGames)
+            in  whoMightWin g m (depth + 1)
+
 
 boardToString :: String -> Board -> String
 boardToString boardString board =
@@ -330,55 +335,3 @@ updateBoardPrint board = do
     let updatedStr = boardToString boardString board
     writeFile "Board.txt" updatedStr
     return updatedStr
-
-
---Printing
-
-playerString :: Maybe Player -> String
-playerString (Just B) = "B"
-playerString (Just W) = "W"
-playerString Nothing  = "O"
-
-stringPlayer :: String -> Maybe Player
-stringPlayer "B" = Just B
-stringPlayer "W" = Just W
-stringPlayer "O" = Nothing
-stringPlayer x = error (x ++ " is not a valid player (did you make sure that the string is uppercase?)")
-
-playerChar :: Maybe Player -> Char
-playerChar (Just B) = 'B'
-playerChar (Just W) = 'W'
-playerChar Nothing  = 'O'
-
-removeMaybe :: Maybe Player -> Player
-removeMaybe (Just B) = B
-removeMaybe (Just W) = W
-removeMaybe _ = error "Needs to be an actual player"
-
---String that looks like the game in progress.
-prettyPrint :: Game -> String
-prettyPrint (board, _, _, _, _) = "7 " ++ playerString (lookupPlayer board (1,7)) ++ "        " ++ playerString (lookupPlayer board (4,7)) ++ "        " ++ playerString (lookupPlayer board (7,7)) ++ "\n6    " ++ playerString (lookupPlayer board (2,6)) ++ "     " ++ playerString (lookupPlayer board (4,6)) ++ "     " ++ playerString (lookupPlayer board (6,6)) ++ "\n5       " ++ playerString (lookupPlayer board (3,5)) ++ "  " ++ playerString (lookupPlayer board (4,5)) ++ "  " ++ playerString (lookupPlayer board (5,5)) ++ "\n4 " ++ playerString (lookupPlayer board (1,4)) ++ "  " ++ playerString (lookupPlayer board (2,4)) ++ "  " ++ playerString (lookupPlayer board (3,4)) ++ "     " ++ playerString (lookupPlayer board (5,4)) ++ "  " ++ playerString (lookupPlayer board (6,4)) ++ "  " ++ playerString (lookupPlayer board (7,4)) ++ "\n3       " ++ playerString (lookupPlayer board (3,3)) ++ "  " ++ playerString (lookupPlayer board (4,3)) ++ "  " ++ playerString (lookupPlayer board (5,3)) ++ "\n2    " ++ playerString (lookupPlayer board (2,2)) ++ "     " ++ playerString (lookupPlayer board (4,2)) ++ "     " ++ playerString (lookupPlayer board (6,2)) ++ "\n1 " ++ playerString (lookupPlayer board (1,1)) ++ "        " ++ playerString (lookupPlayer board (4,1)) ++ "        " ++ playerString (lookupPlayer board (7,1)) ++ "\n  1  2  3  4  5  6  7\n"
-
---For testing IO in GHCi
-testOut :: Game -> IO ()
-testOut g = putStrLn (prettyPrint g)
-
---String that is put in file
-pickle :: Game -> String
-pickle (board, player, phase, mill, turn) = 
-    [playerChar (snd s) | s <- board] ++ " " 
-    ++ playerString (Just player) ++ " " 
-    ++ show phase ++ " " 
-    ++ show mill ++ " "
-    ++ show turn
-
---Game that is read out
-unpickle :: String -> Game
-unpickle string = 
-    let [b, pl, ph, m, t] = splitOn " " string
-        board  = zip allPoints [stringPlayer [x] | x <- b]
-        player = stringPlayer pl
-        phase  = read ph :: Int
-        mill   = read m :: Bool
-        turn   = read t :: Int
-    in  (board, removeMaybe player, phase, mill, turn)
