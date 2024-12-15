@@ -47,11 +47,28 @@ main = do
             let depth = handleDepthFlag flags
             let game = initialG 
             dispatch flags game
+        
             -- if Winner `elem` flags
             --     then do
             --         let bestMAction = bestMove game --Replace with game state? Do I need to read a seperate file in? 
             --         putStrLn $ "Best move: " ++ show bestMAction
             --     else do undefined 
+            input <- getLine
+            let playerCol = map toUpper input
+            if playerCol `elem` quitInputs then quitGame
+            else if playerCol /= "B" && playerCol /= "W"
+                then do
+                    putStrLn (playerCol ++ " is not a valid color.")
+                    main
+                    else do
+                        let enemyCol = if playerCol == "B" then "W" else "B"
+                        putStrLn ("You selected " ++ playerCol ++ "\n")
+                        let player = removeMaybe (stringPlayer playerCol)
+                            enemy = removeMaybe (stringPlayer enemyCol)
+                            game = newGame player
+                        putStrLn "Place your first piece!\n"
+                        showBoard game
+                        placePhase game player
 
 dispatch :: [Flag] -> Game -> IO ()
 dispatch flags game = do
