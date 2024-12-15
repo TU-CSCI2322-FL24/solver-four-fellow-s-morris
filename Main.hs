@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Replace case with fromMaybe" #-}
 {-# HLINT ignore "Redundant return" #-}
+{-# HLINT ignore "Use if" #-}
 module Main where
 import Data.Char
 import System.IO
@@ -17,7 +18,7 @@ data Phase = Set | Move | Fly deriving Eq
 -- I am adding this for the flags 
 
 --why can i not add ( maybe Int) to Depth
-data Flag = Winner String | Depth String | Help String| MoveF String deriving (Show, Eq)
+data Flag = Winner | Depth String | Help | MoveF String | Verbose | Interactive deriving (Show, Eq)
 
 
 
@@ -26,6 +27,8 @@ options=[ Option ['w'] ["winner"] (NoArg Winner) "Print out the best move, using
         , Option ['d'] ["depth"] (ReqArg Depth "<num>") "Specify <num> as a cutoff depth, instead of our default"
         , Option ['h'] ["help"] (NoArg Help) "Print out a good help function and quit the program"
         , Option ['m'] ["move"] (ReqArg MoveF "<move>") "Should apply <move> and print out the resulting board"
+        , Option ['v'] ["verbose"] (NoArg Verbose) "Outputs the move and if the outcome would be: win, lose, tie, or rating"
+        , Option ['i'] ["interactive"] (NoArg Interactive) "Starts a new game and plays against the computer"
 
         ]
 
@@ -42,55 +45,72 @@ main = do
             when (Winner `elem` flags && any depthFlagPresent flags) $
                 putStrLn "Warning: The -d flag has no effect when combined with the -w flag."
             let depth = handleDepthFlag flags
-            let game = undefined --figure out later 
+            let game = initialG 
             dispatch flags game
-            if Winner `elem` flags
+        
+            -- if Winner `elem` flags
+            --     then do
+            --         let bestMAction = bestMove game --Replace with game state? Do I need to read a seperate file in? 
+            --         putStrLn $ "Best move: " ++ show bestMAction
+            --     else do undefined 
+            input <- getLine
+            let playerCol = map toUpper input
+            if playerCol `elem` quitInputs then quitGame
+            else if playerCol /= "B" && playerCol /= "W"
                 then do
-                    let bestMAction = bestMove game --Replace with game state? Do I need to read a seperate file in? 
-                    putStrLn $ "Best move: " ++ show bestMAction
-                else do 
-                    p
+                    putStrLn (playerCol ++ " is not a valid color.")
+                    main
+                    else do
+                        let enemyCol = if playerCol == "B" then "W" else "B"
+                        putStrLn ("You selected " ++ playerCol ++ "\n")
+                        let player = removeMaybe (stringPlayer playerCol)
+                            enemy = removeMaybe (stringPlayer enemyCol)
+                            game = newGame player
+                        putStrLn "Place your first piece!\n"
+                        showBoard game
+                        placePhase game player
 
 dispatch :: [Flag] -> Game -> IO ()
 dispatch flags game = do
-    -- Handle the Winner flag
-    when (Winner `elem` flags) $ winnerAction game (Verbose `elem` flags)
 
-    -- Handle the Depth flag
-    let depth = handleDepthFlag flags
-    case depth of
-        Nothing -> putStrLn "Invalid depth flag"
-        Just d  -> depthAction game d (Verbose `elem` flags)
-
-    -- Handle the Move flag
-    let (moveFlagPresent, move) = handleMoveFlag flags
-    when moveFlagPresent $ do
-        case move of
-            Just mv -> do
-                let newGame = makeMove game mv
-                if Verbose `elem` flags
-                    then do
-                        let rating = rateGame newGame
-                        putStrLn $ "Move: " ++ show mv ++ ", Rating: " ++ show rating
-                        putStrLn $ prettyPrint newGame
-                    else putStrLn $ "New board: " ++ pickle newGame
-            Nothing -> putStrLn "Invalid move format or move not allowed."
-
-    -- Handle the Interactive flag
-    when (Interactive `elem` flags) $ do
-        let depth = fromMaybe 4 $ handleDepthFlag flags
-        playGame game depth
+    let  verb = Verbose `elem` flags
+    case (Winner `elem` flags,  handleMoveFlag flags, handleDepthFlag flags) of
+      (True, _, _) -> winnerIo game verb
+      (_, (True, Nothing), _ ) -> putStrLn "Invalid move flag"
+      (_, (True, Just mv), _ ) -> moveAction game mv verb
+      (_, _, Nothing) -> putStrLn "Invalid depth flag"
+      (_, _, Just depth) -> depthAction game depth verb 
 
 
 
-winnerAction :: (Action, Game) -> Bool -> IO ()
-winnerAction game False = putStrLn $ "Best move: " ++ show (bestMove game)
 
-moveAction game False = undefined
 
-moveAction game True = undefined
+-- when winner Flag is passed print out the best move 
+--verbose is the false 
+-- with verbos u add more infromation 
+winnerIo :: Game -> Bool -> IO ()
+winnerIo game False = putStrLn $ "Best move: " ++ show (bestMove game)
 
-depthAction game depth False = putStrLn $ "Selected depth: " ++ show depth
+-- 
+
+--moveAction :: Game -> (Rating, Maybe Action) -> Bool -> String
+--helperMove game (rate, maybeM) verbose =
+    --case maybeM of 
+        --Nothing -> "Either not valid or no valid move"
+        --Just move ->
+           -- case verbose of 
+               -- False -> "The move: " ++ show (makeMove game move) ++ "Sorry did not have enough time to present the board"
+               -- True -> "The move: " ++ show (makeMove game move) ++ " The analysis: " ++ show (rateGame game)
+moveAction :: Game -> Action -> Bool -> IO ()
+-- can't quit print the standout board after moveing because know one wrote a file read
+moveAction game move False = putStrLn $ "The move: " ++ show (makeMove game move) 
+
+--because it is verbose do i just pretty print and 
+-- should I do 
+moveAction game move True = putStrLn $ "The move: " ++ show (makeMove game move) ++ "How good is the move:" ++ show (rateGame game) 
+
+-- have a question about this one!!!!!!!
+depthAction game depth False = putStrLn $ "The good move is: " ++ show (whoMightWin game depth) 
 
 -- checking for depth flag 
 depthFlagPresent :: Flag -> Bool
@@ -103,21 +123,23 @@ defaultDepth = 4
 
 -- handles Depth Flag
 -- default is 4 
-handleDepthFlag :: [Flag] ->  Maybe Int
-handleDepthFlag flags =
-    case [readMaybe dep | Depth dep <- flags] of
-        []        -> Just defaultDepth 
-        [Nothing] -> Nothing
-        [Just dep] | dep > 0 -> dep   
-                   | otherwise -> Nothing
-        _         -> Nothing
---handleDepthFlag :: [Flag] -> Maybe Int
---handleDepthFlag [] = 4
---handleDepthFlag (Depth d:xs) = read d
---handleDepthFlag (x:xs) = handleDepthFlag xs
+--handleDepthFlag :: [Flag] ->  Maybe Int
+--handleDepthFlag flags =
+--    case [readMaybe dep | Depth dep <- flags] of
+--        []        -> Just defaultDepth 
+--        [Nothing] -> Nothing
+--        [Just dep] | dep > 0 -> dep   
+--                   | otherwise -> Nothing
+--        _         -> Nothing
+handleDepthFlag :: [Flag] -> Maybe Int
+handleDepthFlag [] = Just 4
+handleDepthFlag (Depth d:xs) = readMaybe d
+handleDepthFlag (x:xs) = handleDepthFlag xs
+
+
 handleMoveFlag :: [Flag] -> (Bool, Maybe Action)
 handleMoveFlag flags =
-    case [readAction dep | MoveF dep <- flags] of
+    case [readMaybe dep | MoveF dep <- flags] of
         []        -> (False, Nothing)
         [Nothing] -> (True, Nothing)
         [Just mv] -> (True, Just mv)

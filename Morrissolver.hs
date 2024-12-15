@@ -13,7 +13,7 @@ import Data.List.Split
 data Player = B | W deriving (Eq, Show)
 
 --data Turn = Place | Remove deriving (Eq, Show)
-data Action = Put Point | Move (Point, Point) | Remove Point deriving (Eq, Show)
+data Action = Put Point | Move (Point, Point) | Remove Point deriving (Eq, Show, Read)
 --Move is a tuple of the 2 points that are changed in a move (ex: moving a piece off of one point 
 --and onto another). Returns true if that move will give the current player a morris
 --ReMove is for removing a piece if you have a morris
@@ -58,10 +58,18 @@ type TurnCounter = Int
 type Game = (Board, Player, Phase, Bool, TurnCounter)
 
 
+initialG :: ([Place], Player, Int, Bool, Int)
+initialG = (initialB, W, 1, False, 0)
+
+initialB :: [Place]
+initialB = [(pnt, Nothing)| pnt <- allPoints]
+
+
 allPoints :: [Point]
 allPoints = [(1,7), (1,4), (1,1), (2,6), (2,4), (2,2), (3,5),
             (3,4), (3,3), (4,7), (4,5), (4,3), (4,1), (5,5),
             (5,4), (5,3), (6,6), (6,4), (6,2), (7,7), (7,4), (7,1)]
+
 
 -- there must be an easier way then hardcoding all the 
 -- when have a mill can remove those edges 
@@ -105,6 +113,7 @@ allMills = [ [(1,1), (1,4), (1,7)],
              [(3,5), (4,5), (5,5)],
              [(2,6), (4,6), (6,6)],
              [(1,7), (4,7), (7,7)] ]
+
 
 
 newGame :: Player -> Game
