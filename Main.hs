@@ -72,6 +72,7 @@ main = do
 
 dispatch :: [Flag] -> Game -> IO ()
 dispatch flags game = do
+
     let  verb = Verbose `elem` flags
     case (Winner `elem` flags,  handleMoveFlag flags, handleDepthFlag flags) of
       (True, _, _) -> winnerIo game verb
@@ -79,6 +80,7 @@ dispatch flags game = do
       (_, (True, Just mv), _ ) -> moveAction game mv verb
       (_, _, Nothing) -> putStrLn "Invalid depth flag"
       (_, _, Just depth) -> depthAction game depth verb 
+
 
 
 
