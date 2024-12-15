@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Replace case with fromMaybe" #-}
 {-# HLINT ignore "Redundant return" #-}
+{-# HLINT ignore "Use if" #-}
 module Main where
 import Data.Char
 import System.IO
@@ -68,17 +69,26 @@ dispatch flags game = do
 -- when winner Flag is passed print out the best move 
 --verbose is the false 
 -- with verbos u add more infromation 
-winnerIo :: (Game) -> Bool -> IO ()
+winnerIo :: Game -> Bool -> IO ()
 winnerIo game False = putStrLn $ "Best move: " ++ show (bestMove game)
 
 -- 
+
+--moveAction :: Game -> (Rating, Maybe Action) -> Bool -> String
+--helperMove game (rate, maybeM) verbose =
+    --case maybeM of 
+        --Nothing -> "Either not valid or no valid move"
+        --Just move ->
+           -- case verbose of 
+               -- False -> "The move: " ++ show (makeMove game move) ++ "Sorry did not have enough time to present the board"
+               -- True -> "The move: " ++ show (makeMove game move) ++ " The analysis: " ++ show (rateGame game)
 moveAction :: Game -> Action -> Bool -> IO ()
 -- can't quit print the standout board after moveing because know one wrote a file read
-moveAction game move False = putStrLn $ "The move: " ++ show (makeMove game move)
+moveAction game move False = putStrLn $ "The move: " ++ show (makeMove game move) 
 
 --because it is verbose do i just pretty print and 
 -- should I do 
-moveAction game move True = putStrLn $ "The move: " ++ show (makeMove game move) ++ "How good is the move:" ++ show ()
+moveAction game move True = putStrLn $ "The move: " ++ show (makeMove game move) ++ "How good is the move:" ++ show (rateGame game) 
 
 -- have a question about this one!!!!!!!
 depthAction game depth False = putStrLn $ "The good move is: " ++ show (whoMightWin game depth) 
